@@ -22,10 +22,10 @@ Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
 #define NOMINMAX // no min() and max() macro declarations
 #define __HUGE
 
-// Fix Google Breakpad build for Mac App Store version
-#ifdef Q_OS_MAC
+// Fix Google Breakpad build for Mac App Store version and for Linux Ubuntu
+#if defined Q_OS_MAC || defined Q_OS_LINUX
 #define __STDC_FORMAT_MACROS
-#endif // Q_OS_MAC
+#endif // Q_OS_MAC || Q_OS_LINUX
 
 #ifdef __cplusplus
 

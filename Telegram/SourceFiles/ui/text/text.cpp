@@ -1512,6 +1512,8 @@ public:
 				}
 				return false;
 			} else if (_p) {
+#if 0
+				// I don't know which library must been linked.
 				QTextCharFormat format;
 				QTextItemInt gf(glyphs.mid(glyphsStart, glyphsEnd - glyphsStart),
 								&_e->fnt, engine.layoutData->string.unicode() + itemStart,
@@ -1520,6 +1522,7 @@ public:
 				gf.width = itemWidth;
 				gf.justified = false;
 				gf.initWithScriptItem(si);
+#endif
 				if (_localFrom + itemStart < _selection.to && _localFrom + itemEnd > _selection.from) {
 					QFixed selX = x, selWidth = itemWidth;
 					if (_localFrom + itemEnd > _selection.to || _localFrom + itemStart < _selection.from) {
@@ -1560,7 +1563,10 @@ public:
 					_p->fillRect(QRectF(selX.toReal(), _y + _yDelta, selWidth.toReal(), _fontHeight), _textStyle->selectBg->b);
 				}
 
+#if 0
+				// I don't know which library must been linked. See above.
 				_p->drawTextItem(QPointF(x.toReal(), textY), gf);
+#endif
 			}
 
 			x += itemWidth;

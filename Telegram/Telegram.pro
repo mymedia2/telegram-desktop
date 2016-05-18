@@ -1,6 +1,9 @@
 QT += core gui network widgets
 
-CONFIG += plugin static c++11
+CONFIG += plugin c++11
+
+DEFINES += TDESKTOP_DISABLE_AUTOUPDATE
+DEFINES += TDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME
 
 CONFIG(debug, debug|release) {
     DEFINES += _DEBUG
@@ -10,7 +13,6 @@ CONFIG(debug, debug|release) {
     DESTDIR = ./../Debug
 }
 CONFIG(release, debug|release) {
-    DEFINES += CUSTOM_API_ID
     OBJECTS_DIR = ./../ReleaseIntermediate
     MOC_DIR = ./GeneratedFiles/Release
     RCC_DIR = ./GeneratedFiles
@@ -385,10 +387,6 @@ HEADERS += \
   ./SourceFiles/pspecific_mac.h
 }
 
-SOURCES += \
-  ./ThirdParty/minizip/zip.c \
-  ./ThirdParty/minizip/ioapi.c
-
 CONFIG += precompile_header
 
 PRECOMPILED_HEADER = ./SourceFiles/stdafx.h
@@ -400,7 +398,7 @@ CONFIG(release, debug|release) {
     QMAKE_CXXFLAGS_RELEASE -= -O2
     QMAKE_CXXFLAGS_RELEASE += -Ofast -flto -fno-strict-aliasing -g
     QMAKE_LFLAGS_RELEASE -= -O1
-    QMAKE_LFLAGS_RELEASE += -Ofast -flto -g -rdynamic -static-libstdc++
+    QMAKE_LFLAGS_RELEASE += -Ofast -flto -g -rdynamic
 }
 # Linux 32bit fails Release link with Link-Time Optimization: virtual memory exhausted
 unix {
@@ -412,20 +410,20 @@ unix {
     }
 }
 CONFIG(debug, debug|release) {
-	QMAKE_LFLAGS_DEBUG += -g -rdynamic -static-libstdc++
+	QMAKE_LFLAGS_DEBUG += -g -rdynamic
 }
 
-include(qt_static.pri)
+INCLUDEPATH += "/usr/include/$${DEB_HOST_MULTIARCH}/gt5/QtGui/$${QT_TDESKTOP_VERSION}/QtGui" \
+               "/usr/include/$${DEB_HOST_MULTIARCH}/gt5/QtCore/$${QT_TDESKTOP_VERSION}/QtCore" \
+               "/usr/include/$${DEB_HOST_MULTIARCH}/gt5" \
+INCLUDEPATH += "./SourceFiles" \
+               "./GeneratedFiles"
 
-INCLUDEPATH += \
-               /usr/local/include\
-               /usr/local/include/opus\
-               ./SourceFiles\
-               ./GeneratedFiles\
-               ./ThirdParty/minizip\
-               ./../../Libraries/breakpad/src
-
+INCLUDEPATH += "/usr/include"
+INCLUDEPATH += "/usr/include/opus"
+INCLUDEPATH += "/usr/include/breakpad"
 INCLUDEPATH += "/usr/include/libappindicator-0.1"
+INCLUDEPATH += "/usr/include/libappindicator3-0.1"
 INCLUDEPATH += "/usr/include/gtk-2.0"
 INCLUDEPATH += "/usr/include/glib-2.0"
 INCLUDEPATH += "/usr/lib/x86_64-linux-gnu/glib-2.0/include"
@@ -436,17 +434,15 @@ INCLUDEPATH += "/usr/lib/x86_64-linux-gnu/gtk-2.0/include"
 INCLUDEPATH += "/usr/lib/i386-linux-gnu/gtk-2.0/include"
 INCLUDEPATH += "/usr/include/gdk-pixbuf-2.0"
 INCLUDEPATH += "/usr/include/atk-1.0"
-
 INCLUDEPATH += "/usr/include/dee-1.0"
 INCLUDEPATH += "/usr/include/libdbusmenu-glib-0.4"
+INCLUDEPATH += "/usr/include/minizip"
 
 LIBS += -ldl -llzma -lopenal -lavformat -lavcodec -lswresample -lswscale -lavutil -lopus -lva
-LIBS += $${QT_TDESKTOP_PATH}/plugins/platforminputcontexts/libcomposeplatforminputcontextplugin.a \
-        $${QT_TDESKTOP_PATH}/plugins/platforminputcontexts/libibusplatforminputcontextplugin.a \
-        $${QT_TDESKTOP_PATH}/plugins/platforminputcontexts/libfcitxplatforminputcontextplugin.a
-LIBS += /usr/local/lib/libz.a
-LIBS += /usr/local/lib/libxkbcommon.a
-LIBS += ./../../../Libraries/breakpad/src/client/linux/libbreakpad_client.a
+LIBS += -lz
+LIBS += -lminizip
+LIBS += -lbreakpad_client
+LIBS += -lcrypto -lssl
 
 RESOURCES += \
     ./Resources/telegram.qrc \
