@@ -30,6 +30,43 @@ Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
 #include "boxes/confirmbox.h"
 #include "mainwindow.h"
 
+// This is a copy from Qt source file qtextengine.cpp for TextPainter::drawLine.
+// Temporary fix it here.
+// TODO: find a dynamic library which contains this methods.
+QTextItemInt::QTextItemInt(const QGlyphLayout &g, QFont *font, const QChar *chars_, int numChars, QFontEngine *fe, const QTextCharFormat &format)
+    : flags(0), justified(false), underlineStyle(QTextCharFormat::NoUnderline), charFormat(format),
+      num_chars(numChars), chars(chars_), logClusters(0), f(font),  glyphs(g), fontEngine(fe)
+{
+}
+
+// Fix up flags and underlineStyle with given info
+void QTextItemInt::initWithScriptItem(const QScriptItem &si)
+{
+    // explicitly initialize flags so that initFontAttributes can be called
+    // multiple times on the same TextItem
+    flags = 0;
+    if (si.analysis.bidiLevel %2)
+        flags |= QTextItem::RightToLeft;
+    ascent = si.ascent;
+    descent = si.descent;
+
+    if (charFormat.hasProperty(QTextFormat::TextUnderlineStyle)) {
+        underlineStyle = charFormat.underlineStyle();
+    } else if (charFormat.boolProperty(QTextFormat::FontUnderline)
+               || f->d->underline) {
+        underlineStyle = QTextCharFormat::SingleUnderline;
+    }
+
+    // compat
+    if (underlineStyle == QTextCharFormat::SingleUnderline)
+        flags |= QTextItem::Underline;
+
+    if (f->d->overline || charFormat.fontOverline())
+        flags |= QTextItem::Overline;
+    if (f->d->strikeOut || charFormat.fontStrikeOut())
+        flags |= QTextItem::StrikeOut;
+}
+
 namespace {
 
 const style::textStyle *_textStyle = nullptr;
@@ -1512,8 +1549,6 @@ public:
 				}
 				return false;
 			} else if (_p) {
-#if 0
-				// I don't know which library must been linked.
 				QTextCharFormat format;
 				QTextItemInt gf(glyphs.mid(glyphsStart, glyphsEnd - glyphsStart),
 								&_e->fnt, engine.layoutData->string.unicode() + itemStart,
@@ -1522,7 +1557,6 @@ public:
 				gf.width = itemWidth;
 				gf.justified = false;
 				gf.initWithScriptItem(si);
-#endif
 				if (_localFrom + itemStart < _selection.to && _localFrom + itemEnd > _selection.from) {
 					QFixed selX = x, selWidth = itemWidth;
 					if (_localFrom + itemEnd > _selection.to || _localFrom + itemStart < _selection.from) {
@@ -1563,10 +1597,7 @@ public:
 					_p->fillRect(QRectF(selX.toReal(), _y + _yDelta, selWidth.toReal(), _fontHeight), _textStyle->selectBg->b);
 				}
 
-#if 0
-				// I don't know which library must been linked. See above.
 				_p->drawTextItem(QPointF(x.toReal(), textY), gf);
-#endif
 			}
 
 			x += itemWidth;
