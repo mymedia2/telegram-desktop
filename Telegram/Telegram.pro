@@ -49,7 +49,14 @@ codegen_lang.target = lang_target
 codegen_lang.depends = ./../../Telegram/Resources/langs/lang.strings
 codegen_lang.commands = mkdir -p ./GeneratedFiles && ./../DebugLang/MetaLang -lang_in ./../../Telegram/Resources/langs/lang.strings -lang_out ./GeneratedFiles/lang_auto
 
-QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang
+fix_style_basic.target = GeneratedFiles/styles/style_basic.cpp
+fix_style_basic.depends = style_target
+fix_style_basic_types.target = GeneratedFiles/styles/style_basic_types.cpp
+fix_style_basic_types.depends = style_target
+fix_style_overview.target = GeneratedFiles/styles/style_overview.cpp
+fix_style_overview.depends = style_target
+
+QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang fix_style_basic fix_style_basic_types fix_style_overview
 
 PRE_TARGETDEPS += style_target numbers_target lang_target
 

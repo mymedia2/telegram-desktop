@@ -1,0 +1,67 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export DH_VERBOSE=1
+export QT_SELECT=qt5
+export QT_TDESKTOP_VERSION=5.6.0
+#export DEB_BUILD_OPTIONS
+
+DISTDIR = debian/telegram-desktop
+MKDIR = mkdir -p
+RMDIR = $(RM) -r
+QMAKE = qmake -qt5 CONFIG+=debug
+INSTALL = install
+INSTALL_FILE    = $(INSTALL) -p    -o root -g root  -m 644
+INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
+INSTALL_SCRIPT  = $(INSTALL) -p    -o root -g root  -m 755
+INSTALL_DIR     = $(INSTALL) -p -d -o root -g root  -m 755
+
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+ INSTALL_PROGRAM += -s
+endif
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure: codegen_style_configure codegen_numbers_configure meta_lang_configure telegram_desktop_configure
+
+override_dh_auto_build: telegram_desktop_build
+
+override_dh_auto_install:
+	$(INSTALL_PROGRAM) Linux/Debug/Telegram $(DISTDIR)/usr/bin/tdesktop
+
+codegen_style_configure:
+	$(MKDIR) Linux/obj/codegen_style/Debug
+	cd Linux/obj/codegen_style/Debug && $(QMAKE) ../../../../Telegram/build/qmake/codegen_style/codegen_style.pro
+
+codegen_style_build: codegen_style_configure
+	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_style/Debug
+
+codegen_numbers_configure:
+	$(MKDIR) Linux/obj/codegen_numbers/Debug
+	cd Linux/obj/codegen_numbers/Debug && $(QMAKE) ../../../../Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
+
+codegen_numbers_build: codegen_numbers_configure
+	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_numbers/Debug
+
+meta_lang_configure:
+	$(MKDIR) Linux/DebugIntermediateLang
+	cd Linux/DebugIntermediateLang && $(QMAKE) ../../Telegram/MetaLang.pro
+
+meta_lang_build: meta_lang_configure
+	$(MAKE) $(MFLAGS) -C Linux/DebugIntermediateLang
+
+telegram_desktop_configure:
+	$(MKDIR) Linux/DebugIntermediate
+	cd Linux/DebugIntermediate && $(QMAKE) ../../Telegram/Telegram.pro
+
+telegram_desktop_build: codegen_style_build codegen_numbers_build meta_lang_build telegram_desktop_configure
+	$(MAKE) $(MFLAGS) -C Linux/DebugIntermediate
+
+.PHONY: override_dh_auto_configure override_dh_auto_build \
+	codegen_style_configure codegen_numbers_configure meta_lang_configure telegram_desktop_configure \
+	codegen_style_build codegen_numbers_build meta_lang_build telegram_desktop_build
