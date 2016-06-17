@@ -1,0 +1,5 @@
+telegram-desktop (0.9.51-1) experimental; urgency=low
+
+  * Initial build (Closes: #767418)
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 May 2016 19:32:30 +0300

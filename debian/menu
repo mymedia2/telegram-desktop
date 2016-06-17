@@ -1,0 +1,6 @@
+?package(telegram-desktop): \
+  needs="X11" \
+  section="Applications/Network/Communication"\
+  title="Telegram Desktop" \
+  command="/usr/bin/tdesktop" \
+  icon="/usr/bin/tdesktop"

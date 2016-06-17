@@ -1,6 +1,6 @@
 QT += core gui network widgets
 
-CONFIG += plugin c++11
+CONFIG += plugin c++14
 
 DEFINES += TDESKTOP_DISABLE_AUTOUPDATE
 DEFINES += TDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME
@@ -55,8 +55,14 @@ fix_style_basic_types.target = GeneratedFiles/styles/style_basic_types.cpp
 fix_style_basic_types.depends = style_target
 fix_style_overview.target = GeneratedFiles/styles/style_overview.cpp
 fix_style_overview.depends = style_target
+fix_style_dialogs.target = GeneratedFiles/styles/style_dialogs.cpp
+fix_style_dialogs.depends = style_target
+fix_style_history.target = GeneratedFiles/styles/style_history.cpp
+fix_style_history.depends = style_target
+fix_style_profile.target = GeneratedFiles/styles/style_profile.cpp
+fix_style_profile.depends = style_target
 
-QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang fix_style_basic fix_style_basic_types fix_style_overview
+QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang fix_style_basic fix_style_basic_types fix_style_overview fix_style_dialogs fix_style_history fix_style_profile
 
 PRE_TARGETDEPS += style_target numbers_target lang_target
 
@@ -420,9 +426,8 @@ CONFIG(debug, debug|release) {
 	QMAKE_LFLAGS_DEBUG += -g -rdynamic
 }
 
-INCLUDEPATH += "/usr/include/$${DEB_HOST_MULTIARCH}/gt5/QtGui/$${QT_TDESKTOP_VERSION}/QtGui" \
-               "/usr/include/$${DEB_HOST_MULTIARCH}/gt5/QtCore/$${QT_TDESKTOP_VERSION}/QtCore" \
-               "/usr/include/$${DEB_HOST_MULTIARCH}/gt5" \
+include(qt_static.pri)
+
 INCLUDEPATH += "./SourceFiles" \
                "./GeneratedFiles"
 

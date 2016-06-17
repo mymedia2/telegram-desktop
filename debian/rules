@@ -3,13 +3,13 @@
 
 export DH_VERBOSE=1
 export QT_SELECT=qt5
-export QT_TDESKTOP_VERSION=5.6.0
+#export QT_TDESKTOP_VERSION=5.5.1
 #export DEB_BUILD_OPTIONS
 
 DISTDIR = debian/telegram-desktop
 MKDIR = mkdir -p
 RMDIR = $(RM) -r
-QMAKE = qmake -qt5 CONFIG+=debug
+QMAKE = qmake -qt5 CONFIG+=debug QT_TDESKTOP_VERSION=5.5.1
 INSTALL = install
 INSTALL_FILE    = $(INSTALL) -p    -o root -g root  -m 644
 INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
@@ -32,7 +32,15 @@ override_dh_auto_configure: codegen_style_configure codegen_numbers_configure me
 override_dh_auto_build: telegram_desktop_build
 
 override_dh_auto_install:
-	$(INSTALL_PROGRAM) Linux/Debug/Telegram $(DISTDIR)/usr/bin/tdesktop
+	$(INSTALL_DIR) $(DISTDIR)/usr/bin
+	test -e Linux/Release/Telegram -a ! -e Linux/Debug/Telegram -o Linux/Release/Telegram -nt Linux/Debug/Telegram && \
+		$(INSTALL_PROGRAM) -T Linux/Release/Telegram $(DESTDIR)/usr/bin/tdesktop || \
+		$(INSTALL_PROGRAM) -T Linux/Debug/Telegram $(DESTDIR)/usr/bin/tdesktop
+
+override_dh_auto_clean:
+	$(RMDIR) Linux
+	$(RM) Telegram/Resources/art/sprite_125x.png Telegram/Resources/art/sprite_150x.png
+	$(RM) debian/telegram-desktop.substvars debian/telegram-desktop.debhelper.log debian/debhelper-build-stamp debian/files
 
 codegen_style_configure:
 	$(MKDIR) Linux/obj/codegen_style/Debug

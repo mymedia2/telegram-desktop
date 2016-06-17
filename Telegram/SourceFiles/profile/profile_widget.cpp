@@ -128,7 +128,7 @@ void Widget::onScroll() {
 	auto windowHandle = window()->windowHandle();
 	auto globalPoint = QCursor::pos();
 	auto localPoint = windowHandle->mapFromGlobal(globalPoint);
-	QMouseEvent ev(QEvent::MouseMove, localPoint, localPoint, globalPoint, Qt::NoButton, QGuiApplication::mouseButtons(), QGuiApplication::keyboardModifiers(), Qt::MouseEventSynthesizedByApplication);
+	QMouseEvent ev(QEvent::MouseMove, localPoint, localPoint, globalPoint, Qt::NoButton, QGuiApplication::mouseButtons(), QGuiApplication::keyboardModifiers());
 	ev.setTimestamp(getms());
 
 	QGuiApplication::sendEvent(windowHandle, &ev);
