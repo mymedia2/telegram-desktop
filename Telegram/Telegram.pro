@@ -53,7 +53,6 @@ SOURCES += \
     ./GeneratedFiles/styles/style_overview.cpp \
     ./GeneratedFiles/styles/style_profile.cpp \
     ./SourceFiles/main.cpp \
-    ./SourceFiles/stdafx.cpp \
     ./SourceFiles/apiwrap.cpp \
     ./SourceFiles/app.cpp \
     ./SourceFiles/application.cpp \
