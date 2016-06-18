@@ -1,3 +1,11 @@
+telegram-desktop (0.9.51-2~rc4) unstable; urgency=low
+
+  * Fix lintian errors
+  * License OpenSSL exception added
+  * Menu incons
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Sat, 18 Jun 2016 21:53:28 +0300
+
 telegram-desktop (0.9.51-2~rc3) unstable; urgency=low
 
   * Autodetect plugin path
