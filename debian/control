@@ -10,7 +10,7 @@ Vcs-Browser: https://github.com/telegramdesktop/tdesktop
 
 Package: telegram-desktop
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, qt5-image-formats-plugins
 Description: official telegram messaging app
  Telegram is a messaging app with a focus on speed and security, it’s
  super-fast, simple and free. You can use Telegram on all your devices at the

@@ -4,11 +4,11 @@ telegram-desktop for Debian
 Telegram is secure messenger from Pavel Durov.
 This build yet has known issues:
  * Icon isn't displaying on system tray
- * Emoji and stickers aren't showing
  * Poor font is used
  * No sounds
  * File Open Dialog from Qt
  * It crashes in the moment exit
  * An ugly mouse pointers
+ * No oriental characters
 
  -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 May 2016 19:32:30 +0300
