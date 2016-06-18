@@ -1,3 +1,11 @@
+telegram-desktop (0.9.51-2~rc3) unstable; urgency=low
+
+  * Autodetect plugin path
+  * Remove stdafx.cpp
+  * Repair emoji and stickers
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Sat, 18 Jun 2016 18:51:58 +0300
+
 telegram-desktop (0.9.51-2~rc2) experimental; urgency=low
 
   * Fix a race when package build in parallel mode
