@@ -8,7 +8,6 @@ This build yet has known issues:
  * Poor font is used
  * No sounds
  * File Open Dialog from Qt
- * The application doesn't run without environment variable QT_PLUGIN_PATH
  * It crashes in the moment exit
  * An ugly mouse pointers
 

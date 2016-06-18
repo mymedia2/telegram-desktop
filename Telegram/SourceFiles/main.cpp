@@ -25,6 +25,11 @@ Copyright (c) 2014-2016 John Preston, https://desktop.telegram.org
 #include "localstorage.h"
 
 int main(int argc, char *argv[]) {
+#ifdef Q_OS_LINUX64
+	Application::addLibraryPath("/usr/lib/x86_64-linux-gnu/qt5/plugins");
+#elif defined Q_OS_LINUX32
+	Application::addLibraryPath("/usr/lib/i386-linux-gnu/qt5/plugins");
+#endif
 	settingsParseArgs(argc, argv);
 	if (cLaunchMode() == LaunchModeFixPrevious) {
 		return psFixPrevious();
