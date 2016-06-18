@@ -7,10 +7,12 @@ CONFIG -= app_bundle
 CONFIG(debug, debug|release) {
     OBJECTS_DIR = ./
     DESTDIR = ./../../../codegen/Debug
+    OUTPUT = ../../../DebugIntermediate/GeneratedFiles
 }
 CONFIG(release, debug|release) {
     OBJECTS_DIR = ./
     DESTDIR = ./../../../codegen/Release
+    OUTPUT = ../../../ReleaseIntermediate/GeneratedFiles
 }
 
 INCLUDEPATH += ./../../../SourceFiles
@@ -43,3 +45,5 @@ HEADERS += \
 ./../../../SourceFiles/codegen/numbers/options.h \
 ./../../../SourceFiles/codegen/numbers/parsed_file.h \
 ./../../../SourceFiles/codegen/numbers/processor.h
+
+QMAKE_POST_LINK = $$DESTDIR/$$TARGET -o $$OUTPUT ../../../../Telegram/Resources/numbers.txt

@@ -14,6 +14,7 @@ isEmpty(QT_TDESKTOP_VERSION) {
     QT_TDESKTOP_VERSION = $${QT_TDESKTOP_VERSION_DEFAULT}
 }
 
-INCLUDEPATH += "/usr/include/$$(DEB_HOST_MULTIARCH)/qt5/QtGui/$${QT_TDESKTOP_VERSION}/QtGui" \
-               "/usr/include/$$(DEB_HOST_MULTIARCH)/qt5/QtCore/$${QT_TDESKTOP_VERSION}/QtCore" \
-               "/usr/include/$$(DEB_HOST_MULTIARCH)/qt5" \
+INCLUDEPATH += $${QT_TDESKTOP_PATH}/include/QtGui/$${QT_TDESKTOP_VERSION}/QtGui \
+               $${QT_TDESKTOP_PATH}/include/QtCore/$${QT_TDESKTOP_VERSION}/QtCore \
+               $${QT_TDESKTOP_PATH}/include
+

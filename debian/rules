@@ -7,7 +7,7 @@ export QT_SELECT=qt5
 DESTDIR = debian/telegram-desktop
 MKDIR = mkdir -p
 RMDIR = $(RM) -r
-QMAKE = qmake -qt5 QT_TDESKTOP_VERSION=5.5.1
+QMAKE = qmake -qt5
 INSTALL = install
 INSTALL_FILE    = $(INSTALL) -p    -o root -g root  -m 644
 INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
@@ -42,39 +42,33 @@ override_dh_auto_clean:
 	$(RMDIR) Linux
 	$(RM) Telegram/Resources/art/sprite_125x.png
 	$(RM) Telegram/Resources/art/sprite_150x.png
-	$(RM) debian/telegram-desktop.substvars
-	$(RM) debian/telegram-desktop.debhelper.log
-	$(RM) debian/debhelper-build-stamp
-	$(RM) debian/files
-	$(RM) debian/telegram-desktop.postinst.debhelper
-	$(RM) debian/telegram-desktop.postrm.debhelper
 
 codegen_style_configure:
 	$(MKDIR) Linux/obj/codegen_style/$(BUILD_MODE)
 	cd Linux/obj/codegen_style/$(BUILD_MODE) && $(QMAKE) ../../../../Telegram/build/qmake/codegen_style/codegen_style.pro
 
-codegen_style_build: codegen_style_configure
+codegen_style_build:
 	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_style/$(BUILD_MODE)
 
 codegen_numbers_configure:
 	$(MKDIR) Linux/obj/codegen_numbers/$(BUILD_MODE)
 	cd Linux/obj/codegen_numbers/$(BUILD_MODE) && $(QMAKE) ../../../../Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
 
-codegen_numbers_build: codegen_numbers_configure
+codegen_numbers_build:
 	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_numbers/$(BUILD_MODE)
 
 meta_lang_configure:
 	$(MKDIR) Linux/$(BUILD_MODE)IntermediateLang
 	cd Linux/$(BUILD_MODE)IntermediateLang && $(QMAKE) ../../Telegram/MetaLang.pro
 
-meta_lang_build: meta_lang_configure
+meta_lang_build:
 	$(MAKE) $(MFLAGS) -C Linux/$(BUILD_MODE)IntermediateLang
 
 telegram_desktop_configure:
 	$(MKDIR) Linux/$(BUILD_MODE)Intermediate
 	cd Linux/$(BUILD_MODE)Intermediate && $(QMAKE) ../../Telegram/Telegram.pro
 
-telegram_desktop_build: codegen_style_build codegen_numbers_build meta_lang_build telegram_desktop_configure
+telegram_desktop_build: codegen_style_build codegen_numbers_build meta_lang_build
 	$(MAKE) $(MFLAGS) -C Linux/$(BUILD_MODE)Intermediate
 
 .PHONY: override_dh_auto_configure override_dh_auto_build \

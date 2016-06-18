@@ -1,3 +1,9 @@
+telegram-desktop (0.9.51-2~rc2) experimental; urgency=low
+
+  * Fix a race when package build in parallel mode
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 Jun 2016 13:56:41 +0300
+
 telegram-desktop (0.9.51-2~rc1) experimental; urgency=low
 
   * Fix dependence from metapackage qt5-default
@@ -5,7 +11,7 @@ telegram-desktop (0.9.51-2~rc1) experimental; urgency=low
   * Set an icon in applications menu
   * Release build
 
- -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 May 2016 19:32:30 +0300
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Fri, 17 Jun 2016 03:37:14 +0300
 
 telegram-desktop (0.9.51-1) experimental; urgency=low
 

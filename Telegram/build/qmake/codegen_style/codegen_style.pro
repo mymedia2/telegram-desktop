@@ -7,10 +7,12 @@ CONFIG -= app_bundle
 CONFIG(debug, debug|release) {
     OBJECTS_DIR = ./
     DESTDIR = ./../../../codegen/Debug
+    OUTPUT = ../../../DebugIntermediate/GeneratedFiles
 }
 CONFIG(release, debug|release) {
     OBJECTS_DIR = ./
     DESTDIR = ./../../../codegen/Release
+    OUTPUT = ../../../ReleaseIntermediate/GeneratedFiles
 }
 
 INCLUDEPATH += ./../../../SourceFiles
@@ -49,3 +51,5 @@ HEADERS += \
 ./../../../SourceFiles/codegen/style/processor.h \
 ./../../../SourceFiles/codegen/style/sprite_generator.h \
 ./../../../SourceFiles/codegen/style/structure_types.h
+
+QMAKE_POST_LINK = $$DESTDIR/$$TARGET -I ../../../../Telegram/Resources -I ../../../../Telegram/SourceFiles -o $$OUTPUT/styles ../../../../Telegram/Resources/all_files.style --rebuild
