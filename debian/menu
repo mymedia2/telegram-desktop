@@ -3,12 +3,5 @@
   section="Applications/Network/Communication"\
   title="Telegram Desktop" \
   command="/usr/bin/tdesktop" \
-  icon="/usr/share/pixmaps/telegram-desktop-128.xpm" \
-  icon16x16="/usr/share/pixmaps/telegram-desktop-16.xpm" \
-  icon32x32="/usr/share/pixmaps/telegram-desktop-32.xpm" \
-  icon48x48="/usr/share/pixmaps/telegram-desktop-48.xpm" \
-  icon64x64="/usr/share/pixmaps/telegram-desktop-64.xpm" \
-  icon128x128="/usr/share/pixmaps/telegram-desktop-128.xpm" \
-  icon256x256="/usr/share/pixmaps/telegram-desktop-256.xpm" \
-  icon512x512="/usr/share/pixmaps/telegram-desktop-512.xpm" \
+  icon="/usr/share/pixmaps/telegram-desktop.xpm" \
   longtitle="Official desktop version of Telegram messaging app"
