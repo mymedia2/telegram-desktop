@@ -1,3 +1,12 @@
+telegram-desktop (0.9.51-2~rc1) experimental; urgency=low
+
+  * Fix dependence from metapackage qt5-default
+  * Fix recipe install in script debian/rules
+  * Set an icon in applications menu
+  * Release build
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 May 2016 19:32:30 +0300
+
 telegram-desktop (0.9.51-1) experimental; urgency=low
 
   * Initial build (Closes: #767418)

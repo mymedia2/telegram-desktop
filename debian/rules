@@ -3,19 +3,22 @@
 
 export DH_VERBOSE=1
 export QT_SELECT=qt5
-#export QT_TDESKTOP_VERSION=5.5.1
-#export DEB_BUILD_OPTIONS
 
-DISTDIR = debian/telegram-desktop
+DESTDIR = debian/telegram-desktop
 MKDIR = mkdir -p
 RMDIR = $(RM) -r
-QMAKE = qmake -qt5 CONFIG+=debug QT_TDESKTOP_VERSION=5.5.1
+QMAKE = qmake -qt5 QT_TDESKTOP_VERSION=5.5.1
 INSTALL = install
 INSTALL_FILE    = $(INSTALL) -p    -o root -g root  -m 644
 INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
 INSTALL_SCRIPT  = $(INSTALL) -p    -o root -g root  -m 755
 INSTALL_DIR     = $(INSTALL) -p -d -o root -g root  -m 755
 
+BUILD_MODE = Release
+ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+ QMAKE += CONFIG+=debug
+ BUILD_MODE = Debug
+endif
 ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
  INSTALL_PROGRAM += -s
 endif
@@ -32,44 +35,49 @@ override_dh_auto_configure: codegen_style_configure codegen_numbers_configure me
 override_dh_auto_build: telegram_desktop_build
 
 override_dh_auto_install:
-	$(INSTALL_DIR) $(DISTDIR)/usr/bin
-	test -e Linux/Release/Telegram -a ! -e Linux/Debug/Telegram -o Linux/Release/Telegram -nt Linux/Debug/Telegram && \
-		$(INSTALL_PROGRAM) -T Linux/Release/Telegram $(DESTDIR)/usr/bin/tdesktop || \
-		$(INSTALL_PROGRAM) -T Linux/Debug/Telegram $(DESTDIR)/usr/bin/tdesktop
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_PROGRAM) Linux/$(BUILD_MODE)/Telegram $(DESTDIR)/usr/bin/tdesktop
 
 override_dh_auto_clean:
 	$(RMDIR) Linux
-	$(RM) Telegram/Resources/art/sprite_125x.png Telegram/Resources/art/sprite_150x.png
-	$(RM) debian/telegram-desktop.substvars debian/telegram-desktop.debhelper.log debian/debhelper-build-stamp debian/files
+	$(RM) Telegram/Resources/art/sprite_125x.png
+	$(RM) Telegram/Resources/art/sprite_150x.png
+	$(RM) debian/telegram-desktop.substvars
+	$(RM) debian/telegram-desktop.debhelper.log
+	$(RM) debian/debhelper-build-stamp
+	$(RM) debian/files
+	$(RM) debian/telegram-desktop.postinst.debhelper
+	$(RM) debian/telegram-desktop.postrm.debhelper
 
 codegen_style_configure:
-	$(MKDIR) Linux/obj/codegen_style/Debug
-	cd Linux/obj/codegen_style/Debug && $(QMAKE) ../../../../Telegram/build/qmake/codegen_style/codegen_style.pro
+	$(MKDIR) Linux/obj/codegen_style/$(BUILD_MODE)
+	cd Linux/obj/codegen_style/$(BUILD_MODE) && $(QMAKE) ../../../../Telegram/build/qmake/codegen_style/codegen_style.pro
 
 codegen_style_build: codegen_style_configure
-	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_style/Debug
+	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_style/$(BUILD_MODE)
 
 codegen_numbers_configure:
-	$(MKDIR) Linux/obj/codegen_numbers/Debug
-	cd Linux/obj/codegen_numbers/Debug && $(QMAKE) ../../../../Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
+	$(MKDIR) Linux/obj/codegen_numbers/$(BUILD_MODE)
+	cd Linux/obj/codegen_numbers/$(BUILD_MODE) && $(QMAKE) ../../../../Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
 
 codegen_numbers_build: codegen_numbers_configure
-	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_numbers/Debug
+	$(MAKE) $(MFLAGS) -C Linux/obj/codegen_numbers/$(BUILD_MODE)
 
 meta_lang_configure:
-	$(MKDIR) Linux/DebugIntermediateLang
-	cd Linux/DebugIntermediateLang && $(QMAKE) ../../Telegram/MetaLang.pro
+	$(MKDIR) Linux/$(BUILD_MODE)IntermediateLang
+	cd Linux/$(BUILD_MODE)IntermediateLang && $(QMAKE) ../../Telegram/MetaLang.pro
 
 meta_lang_build: meta_lang_configure
-	$(MAKE) $(MFLAGS) -C Linux/DebugIntermediateLang
+	$(MAKE) $(MFLAGS) -C Linux/$(BUILD_MODE)IntermediateLang
 
 telegram_desktop_configure:
-	$(MKDIR) Linux/DebugIntermediate
-	cd Linux/DebugIntermediate && $(QMAKE) ../../Telegram/Telegram.pro
+	$(MKDIR) Linux/$(BUILD_MODE)Intermediate
+	cd Linux/$(BUILD_MODE)Intermediate && $(QMAKE) ../../Telegram/Telegram.pro
 
 telegram_desktop_build: codegen_style_build codegen_numbers_build meta_lang_build telegram_desktop_configure
-	$(MAKE) $(MFLAGS) -C Linux/DebugIntermediate
+	$(MAKE) $(MFLAGS) -C Linux/$(BUILD_MODE)Intermediate
 
 .PHONY: override_dh_auto_configure override_dh_auto_build \
+	override_dh_auto_install override_dh_auto_clean \
 	codegen_style_configure codegen_numbers_configure meta_lang_configure telegram_desktop_configure \
 	codegen_style_build codegen_numbers_build meta_lang_build telegram_desktop_build

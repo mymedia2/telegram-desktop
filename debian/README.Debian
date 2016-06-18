@@ -10,5 +10,6 @@ This build yet has known issues:
  * File Open Dialog from Qt
  * The application doesn't run without environment variable QT_PLUGIN_PATH
  * It crashes in the moment exit
+ * An ugly mouse pointers
 
  -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 18 May 2016 19:32:30 +0300

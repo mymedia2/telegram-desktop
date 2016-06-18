@@ -3,4 +3,5 @@
   section="Applications/Network/Communication"\
   title="Telegram Desktop" \
   command="/usr/bin/tdesktop" \
-  icon="/usr/bin/tdesktop"
+  icon="/usr/bin/tdesktop" \
+  longtitle="Official desktop version of Telegram messaging app"
