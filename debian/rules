@@ -39,6 +39,14 @@ override_dh_auto_build: telegram_desktop_build
 override_dh_auto_install:
 	$(INSTALL_DIR) $(DESTDIR)/usr/bin
 	$(INSTALL_PROGRAM) Linux/$(BUILD_MODE)/Telegram $(DESTDIR)/usr/bin/tdesktop
+	$(INSTALL_DIR) $(DESTDIR)/usr/share/pixmaps
+	$(INSTALL_FILE) Telegram/Resources/art/icon16.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-16.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon32.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-32.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon48.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-48.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon64.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-64.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon128.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-128.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon256.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-256.xpm
+	$(INSTALL_FILE) Telegram/Resources/art/icon512.xpm $(DESTDIR)/usr/share/pixmaps/telegram-desktop-512.xpm
 
 override_dh_auto_clean:
 	$(RMDIR) Linux
