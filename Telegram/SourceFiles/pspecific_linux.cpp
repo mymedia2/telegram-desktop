@@ -40,7 +40,11 @@ extern "C" {
 #define signals public
 } // extern "C"
 
-#include <unity/unity/unity.h>
+#ifndef NO_UNITY
+# include <unity/unity/unity.h>
+#else
+  typedef void UnityLauncherEntry;
+#endif
 
 namespace {
     QByteArray escapeShell(const QByteArray &str) {
@@ -470,6 +474,7 @@ namespace {
     }
 
     void setupUnity() {
+#ifndef NO_UNITY
         if (noTryUnity) return;
 
         QLibrary lib_unity(qstr("unity"), 9, 0);
@@ -480,6 +485,7 @@ namespace {
         if (!loadFunction(lib_unity, "unity_launcher_entry_set_count_visible", ps_unity_launcher_entry_set_count_visible)) return;
         useUnityCount = true;
         DEBUG_LOG(("Unity count api loaded!"));
+#endif
     }
 
     class _PsEventFilter : public QAbstractNativeEventFilter {
@@ -1250,7 +1256,11 @@ namespace PlatformSpecific {
 			QString cdesktop = QString(getenv("XDG_CURRENT_DESKTOP")).toLower();
 			noQtTrayIcon = (cdesktop == qstr("pantheon")) || (cdesktop == qstr("gnome"));
 			tryAppIndicator = (cdesktop == qstr("xfce"));
+#ifndef NO_UNITY
 			noTryUnity = (cdesktop != qstr("unity"));
+#else
+			noTryUnity = true;
+#endif
 
 			if (noQtTrayIcon) cSetSupportTray(false);
 

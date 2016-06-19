@@ -2,8 +2,8 @@ Source: telegram-desktop
 Section: net
 Priority: optional
 Maintainer: Nicholas Guriev <guriev-ns@ya.ru>
-Build-Depends: debhelper (>= 9.0.0), qtbase5-dev, qtbase5-private-dev, libappindicator-dev | libappindicator3-dev, libunity-dev, libopenal-dev, libssl-dev, libavcodec-dev, libavformat-dev, liblzma-dev, libbreakpad-dev, libswscale-dev, libopus-dev, libva-dev, libqt5gui5, fcitx-frontend-qt5, libminizip-dev
-Standards-Version: 3.9.4
+Build-Depends: debhelper (>= 9.0.0), qtbase5-dev, qtbase5-private-dev, libappindicator-dev | libappindicator3-dev, libopenal-dev, libssl-dev, libavcodec-dev, libavformat-dev, liblzma-dev, libbreakpad-dev, libswscale-dev, libopus-dev, libva-dev, libqt5gui5, fcitx-frontend-qt5, libminizip-dev
+Standards-Version: 3.9.8
 Homepage: https://desktop.telegram.org
 Vcs-Git: https://github.com/telegramdesktop/tdesktop
 Vcs-Browser: https://github.com/telegramdesktop/tdesktop
