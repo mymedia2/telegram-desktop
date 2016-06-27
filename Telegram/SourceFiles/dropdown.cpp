@@ -746,10 +746,7 @@ void EmojiPanInner::setMaxHeight(int32 h) {
 }
 
 void EmojiPanInner::setScrollTop(int top) {
-	if (top == _top) return;
-
 	_top = top;
-	updateSelected();
 }
 
 int EmojiPanInner::countHeight() {
@@ -1022,11 +1019,11 @@ void EmojiPanInner::leaveEvent(QEvent *e) {
 	clearSelection();
 }
 
-void EmojiPanInner::leaveToChildEvent(QEvent *e) {
+void EmojiPanInner::leaveToChildEvent(QEvent *e, QWidget *child) {
 	clearSelection();
 }
 
-void EmojiPanInner::enterFromChildEvent(QEvent *e) {
+void EmojiPanInner::enterFromChildEvent(QEvent *e, QWidget *child) {
 	_lastMousePos = QCursor::pos();
 	updateSelected();
 }
@@ -1259,7 +1256,6 @@ void StickerPanInner::setScrollTop(int top) {
 
 	_lastScrolled = getms();
 	_top = top;
-	updateSelected();
 }
 
 int32 StickerPanInner::countHeight(bool plain) {
@@ -1548,11 +1544,11 @@ void StickerPanInner::leaveEvent(QEvent *e) {
 	clearSelection();
 }
 
-void StickerPanInner::leaveToChildEvent(QEvent *e) {
+void StickerPanInner::leaveToChildEvent(QEvent *e, QWidget *child) {
 	clearSelection();
 }
 
-void StickerPanInner::enterFromChildEvent(QEvent *e) {
+void StickerPanInner::enterFromChildEvent(QEvent *e, QWidget *child) {
 	_lastMousePos = QCursor::pos();
 	updateSelected();
 }
@@ -3143,7 +3139,7 @@ void EmojiPan::onRefreshPanels() {
 	}
 }
 
-void EmojiPan::leaveToChildEvent(QEvent *e) {
+void EmojiPan::leaveToChildEvent(QEvent *e, QWidget *child) {
 	if (!_stickersShown) return;
 	_iconsMousePos = QCursor::pos();
 	updateSelected();

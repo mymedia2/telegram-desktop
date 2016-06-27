@@ -609,10 +609,10 @@ void OverviewInner::onDragExec() {
 			mimeData->setData(qsl("application/x-td-forward-selected"), "1");
 		}
 		drag->setMimeData(mimeData);
+		drag->exec(Qt::CopyAction);
 
 		// We don't receive mouseReleaseEvent when drag is finished.
 		ClickHandler::unpressed();
-		drag->exec(Qt::CopyAction);
 		if (App::main()) App::main()->updateAfterDrag();
 		return;
 	} else {
@@ -640,10 +640,10 @@ void OverviewInner::onDragExec() {
 			}
 
 			drag->setMimeData(mimeData);
+			drag->exec(Qt::CopyAction);
 
 			// We don't receive mouseReleaseEvent when drag is finished.
 			ClickHandler::unpressed();
-			drag->exec(Qt::CopyAction);
 			if (App::main()) App::main()->updateAfterDrag();
 			return;
 		}
@@ -1916,7 +1916,6 @@ OverviewWidget::OverviewWidget(QWidget *parent, PeerData *peer, MediaOverviewTyp
 	updateScrollColors();
 
 	_scroll.show();
-	connect(&_scroll, SIGNAL(scrolled()), &_inner, SLOT(onUpdateSelected()));
 	connect(&_scroll, SIGNAL(scrolled()), this, SLOT(onScroll()));
 
 	connect(&_scrollTimer, SIGNAL(timeout()), this, SLOT(onScrollTimer()));
@@ -2044,7 +2043,6 @@ MediaOverviewType OverviewWidget::type() const {
 void OverviewWidget::switchType(MediaOverviewType type) {
 	_selCount = 0;
 
-	disconnect(&_scroll, SIGNAL(scrolled()), &_inner, SLOT(onUpdateSelected()));
 	disconnect(&_scroll, SIGNAL(scrolled()), this, SLOT(onScroll()));
 
 	_inner.setSelectMode(false);
@@ -2062,7 +2060,6 @@ void OverviewWidget::switchType(MediaOverviewType type) {
 	updateTopBarSelection();
 	scrollReset();
 
-	connect(&_scroll, SIGNAL(scrolled()), &_inner, SLOT(onUpdateSelected()));
 	connect(&_scroll, SIGNAL(scrolled()), this, SLOT(onScroll()));
 
 	onScroll();

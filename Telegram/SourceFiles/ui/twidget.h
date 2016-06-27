@@ -127,9 +127,9 @@ return qobject_cast<TWidget*>(parentWidget()); \
 const TWidget *tparent() const { \
 	return qobject_cast<const TWidget*>(parentWidget()); \
 } \
-virtual void leaveToChildEvent(QEvent *e) { /* e -- from enterEvent() of child TWidget */ \
+virtual void leaveToChildEvent(QEvent *e, QWidget *child) { /* e -- from enterEvent() of child TWidget */ \
 } \
-virtual void enterFromChildEvent(QEvent *e) { /* e -- from leaveEvent() of child TWidget */ \
+virtual void enterFromChildEvent(QEvent *e, QWidget *child) { /* e -- from leaveEvent() of child TWidget */ \
 } \
 void moveToLeft(int x, int y, int outerw = 0) { \
 	move(rtl() ? ((outerw > 0 ? outerw : parentWidget()->width()) - x - width()) : x, y); \
@@ -158,13 +158,13 @@ void rtlupdate(int x, int y, int w, int h) { \
 protected: \
 void enterEvent(QEvent *e) override { \
 	TWidget *p(tparent()); \
-	if (p) p->leaveToChildEvent(e); \
-	return QWidget::enterEvent(e); \
+	if (p) p->leaveToChildEvent(e, this); \
+	return enterEventHook(e); \
 } \
 void leaveEvent(QEvent *e) override { \
 	TWidget *p(tparent()); \
-	if (p) p->enterFromChildEvent(e); \
-	return QWidget::leaveEvent(e); \
+	if (p) p->enterFromChildEvent(e, this); \
+	return leaveEventHook(e); \
 }
 
 class TWidget : public QWidget {
@@ -197,6 +197,17 @@ public:
 				widget->show();
 			}
 		}
+	}
+
+	virtual ~TWidget() {
+	}
+
+protected:
+	void enterEventHook(QEvent *e) {
+		return QWidget::enterEvent(e);
+	}
+	void leaveEventHook(QEvent *e) {
+		return QWidget::leaveEvent(e);
 	}
 
 };
@@ -330,3 +341,9 @@ private:
 	T *_widget;
 
 };
+
+void sendSynteticMouseEvent(QWidget *widget, QEvent::Type type, Qt::MouseButton button, const QPoint &globalPoint);
+
+inline void sendSynteticMouseEvent(QWidget *widget, QEvent::Type type, Qt::MouseButton button) {
+	return sendSynteticMouseEvent(widget, type, button, QCursor::pos());
+}

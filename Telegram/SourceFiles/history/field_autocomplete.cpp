@@ -58,7 +58,6 @@ FieldAutocomplete::FieldAutocomplete(QWidget *parent) : TWidget(parent)
 	_inner->show();
 
 	connect(_scroll, SIGNAL(geometryChanged()), _inner, SLOT(onParentGeometryChanged()));
-	connect(_scroll, SIGNAL(scrolled()), _inner, SLOT(onUpdateSelected()));
 }
 
 void FieldAutocomplete::paintEvent(QPaintEvent *e) {
@@ -494,14 +493,24 @@ bool FieldAutocomplete::chooseSelected(ChooseMethod method) const {
 }
 
 bool FieldAutocomplete::eventFilter(QObject *obj, QEvent *e) {
-	if (isHidden()) return QWidget::eventFilter(obj, e);
+	auto hidden = isHidden();
+	auto moderate = Global::ModerateModeEnabled();
+	if (hidden && !moderate) return QWidget::eventFilter(obj, e);
+
 	if (e->type() == QEvent::KeyPress) {
 		QKeyEvent *ev = static_cast<QKeyEvent*>(e);
 		if (!(ev->modifiers() & (Qt::AltModifier | Qt::ControlModifier | Qt::ShiftModifier | Qt::MetaModifier))) {
-			if (ev->key() == Qt::Key_Up || ev->key() == Qt::Key_Down || (!_srows.isEmpty() && (ev->key() == Qt::Key_Left || ev->key() == Qt::Key_Right))) {
-				return _inner->moveSel(ev->key());
-			} else if (ev->key() == Qt::Key_Enter || ev->key() == Qt::Key_Return) {
-				return _inner->chooseSelected(ChooseMethod::ByEnter);
+			if (!hidden) {
+				if (ev->key() == Qt::Key_Up || ev->key() == Qt::Key_Down || (!_srows.isEmpty() && (ev->key() == Qt::Key_Left || ev->key() == Qt::Key_Right))) {
+					return _inner->moveSel(ev->key());
+				} else if (ev->key() == Qt::Key_Enter || ev->key() == Qt::Key_Return) {
+					return _inner->chooseSelected(ChooseMethod::ByEnter);
+				}
+			}
+			if (moderate && ((ev->key() >= Qt::Key_1 && ev->key() <= Qt::Key_9) || ev->key() == Qt::Key_Q)) {
+				bool handled = false;
+				emit moderateKeyActivate(ev->key(), &handled);
+				return handled;
 			}
 		}
 	}

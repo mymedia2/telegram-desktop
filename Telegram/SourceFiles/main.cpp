@@ -42,8 +42,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// both are finished in Application::closeApplication
-	Logs::start(); // must be started before PlatformSpecific is started
-	PlatformSpecific::start(); // must be started before QApplication is created
+	Logs::start(); // must be started before Platform is started
+	Platform::start(); // must be started before QApplication is created
 
 	// prepare fake args to disable QT_STYLE_OVERRIDE env variable
 	// currently this is required in some desktop environments, including Xubuntu 15.10
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	SignalHandlers::finish();
-	PlatformSpecific::finish();
+	Platform::finish();
 	Logs::finish();
 
 	return result;
