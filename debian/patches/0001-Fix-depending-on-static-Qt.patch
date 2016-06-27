@@ -4,8 +4,8 @@ Bug-Debian: https://bugs.debian.org/767418
 Bug-Ubuntu: https://launchpad.net/bugs/1499516
 Last-Update: 2016-06-18
 
---- telegram-desktop-0.9.51.orig/Telegram/MetaLang.pro
-+++ telegram-desktop-0.9.51/Telegram/MetaLang.pro
+--- telegram-desktop-0.9.56.orig/Telegram/MetaLang.pro
++++ telegram-desktop-0.9.56/Telegram/MetaLang.pro
 @@ -5,11 +5,13 @@ CONFIG(debug, debug|release) {
      OBJECTS_DIR = ./../DebugIntermediateLang
      MOC_DIR = ./GeneratedFiles/Debug
@@ -19,7 +19,7 @@ Last-Update: 2016-06-18
 +    OUTPUT = ../ReleaseIntermediate/GeneratedFiles
  }
  
- CONFIG += plugin static c++11
+ CONFIG += plugin static c++14
 @@ -27,4 +29,8 @@ HEADERS += \
      ./SourceFiles/_other/mlmain.h \
      ./SourceFiles/_other/genlang.h \
@@ -30,8 +30,8 @@ Last-Update: 2016-06-18
 +               "/usr/include/$$(DEB_HOST_MULTIARCH)/qt5"
 +
 +QMAKE_POST_LINK = $$DESTDIR/$$TARGET -lang_in ../../Telegram/Resources/langs/lang.strings -lang_out $$OUTPUT/lang_auto
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/main.cpp
-+++ telegram-desktop-0.9.51/Telegram/SourceFiles/main.cpp
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/main.cpp
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/main.cpp
 @@ -25,10 +25,11 @@ Copyright (c) 2014-2016 John Preston, ht
  #include "localstorage.h"
  
@@ -48,18 +48,18 @@ Last-Update: 2016-06-18
  	settingsParseArgs(argc, argv);
  	if (cLaunchMode() == LaunchModeFixPrevious) {
  		return psFixPrevious();
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/profile/profile_widget.cpp
-+++ telegram-desktop-0.9.51/Telegram/SourceFiles/profile/profile_widget.cpp
-@@ -128,7 +128,7 @@ void Widget::onScroll() {
- 	auto windowHandle = window()->windowHandle();
- 	auto globalPoint = QCursor::pos();
- 	auto localPoint = windowHandle->mapFromGlobal(globalPoint);
--	QMouseEvent ev(QEvent::MouseMove, localPoint, localPoint, globalPoint, Qt::NoButton, QGuiApplication::mouseButtons(), QGuiApplication::keyboardModifiers(), Qt::MouseEventSynthesizedByApplication);
-+	QMouseEvent ev(QEvent::MouseMove, localPoint, localPoint, globalPoint, Qt::NoButton, QGuiApplication::mouseButtons(), QGuiApplication::keyboardModifiers());
- 	ev.setTimestamp(getms());
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/platform/linux/linux_libs.h
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/platform/linux/linux_libs.h
+@@ -27,7 +27,7 @@ extern "C" {
+ #define signals public
+ } // extern "C"
  
- 	QGuiApplication::sendEvent(windowHandle, &ev);
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/stdafx.cpp
+-#include <unity/unity/unity.h>
++typedef void UnityLauncherEntry;    // type from libunity
+ 
+ namespace Platform {
+ namespace Libs {
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/stdafx.cpp
 +++ /dev/null
 @@ -1,45 +0,0 @@
 -/*
@@ -107,8 +107,8 @@ Last-Update: 2016-06-18
 -Q_IMPORT_PLUGIN(QFcitxPlatformInputContextPlugin)
 -Q_IMPORT_PLUGIN(QWebpPlugin)
 -#endif
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/stdafx.h
-+++ telegram-desktop-0.9.51/Telegram/SourceFiles/stdafx.h
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/stdafx.h
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/stdafx.h
 @@ -22,10 +22,10 @@ Copyright (c) 2014-2016 John Preston, ht
  #define NOMINMAX // no min() and max() macro declarations
  #define __HUGE
@@ -123,8 +123,8 @@ Last-Update: 2016-06-18
  
  #ifdef __cplusplus
  
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/ui/text/text.cpp
-+++ telegram-desktop-0.9.51/Telegram/SourceFiles/ui/text/text.cpp
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/ui/text/text.cpp
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/ui/text/text.cpp
 @@ -30,6 +30,43 @@ Copyright (c) 2014-2016 John Preston, ht
  #include "boxes/confirmbox.h"
  #include "mainwindow.h"
@@ -169,8 +169,8 @@ Last-Update: 2016-06-18
  namespace {
  
  const style::textStyle *_textStyle = nullptr;
---- telegram-desktop-0.9.51.orig/Telegram/SourceFiles/ui/text/text_block.cpp
-+++ telegram-desktop-0.9.51/Telegram/SourceFiles/ui/text/text_block.cpp
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/ui/text/text_block.cpp
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/ui/text/text_block.cpp
 @@ -333,7 +333,7 @@ TextBlock::TextBlock(const style::font &
  		QStackTextEngine engine(part, blockFont->f);
  		engine.itemize();
@@ -180,12 +180,23 @@ Last-Update: 2016-06-18
  		layout.beginLayout();
  		layout.createLine();
  
---- telegram-desktop-0.9.51.orig/Telegram/Telegram.pro
-+++ telegram-desktop-0.9.51/Telegram/Telegram.pro
+--- telegram-desktop-0.9.56.orig/Telegram/SourceFiles/ui/twidget.cpp
++++ telegram-desktop-0.9.56/Telegram/SourceFiles/ui/twidget.cpp
+@@ -123,7 +123,7 @@ void ToggleableShadow::paintEvent(QPaint
+ void sendSynteticMouseEvent(QWidget *widget, QEvent::Type type, Qt::MouseButton button, const QPoint &globalPoint) {
+ 	auto windowHandle = widget->window()->windowHandle();
+ 	auto localPoint = windowHandle->mapFromGlobal(globalPoint);
+-	QMouseEvent ev(type, localPoint, localPoint, globalPoint, button, QGuiApplication::mouseButtons() | button, QGuiApplication::keyboardModifiers(), Qt::MouseEventSynthesizedByApplication);
++	QMouseEvent ev(type, localPoint, localPoint, globalPoint, button, QGuiApplication::mouseButtons() | button, QGuiApplication::keyboardModifiers());
+ 	ev.setTimestamp(getms());
+ 	QGuiApplication::sendEvent(windowHandle, &ev);
+ }
+--- telegram-desktop-0.9.56.orig/Telegram/Telegram.pro
++++ telegram-desktop-0.9.56/Telegram/Telegram.pro
 @@ -1,6 +1,9 @@
  QT += core gui network widgets
  
--CONFIG += plugin static c++11
+-CONFIG += plugin static c++14
 +CONFIG += plugin c++14
 +
 +DEFINES += TDESKTOP_DISABLE_AUTOUPDATE
@@ -201,36 +212,65 @@ Last-Update: 2016-06-18
      OBJECTS_DIR = ./../ReleaseIntermediate
      MOC_DIR = ./GeneratedFiles/Release
      RCC_DIR = ./GeneratedFiles
-@@ -29,28 +31,6 @@ linux {
+@@ -27,57 +29,6 @@ linux {
      HEADERS += ./SourceFiles/pspecific_linux.h
  }
  
--codegen_style.target = style_target
--codegen_style.depends = FORCE
--codegen_style.commands = ./../codegen/Debug/codegen_style "-I./../../Telegram/Resources" "-I./../../Telegram/SourceFiles" "-o./GeneratedFiles/styles" all_files.style --rebuild
--
--codegen_numbers.target = numbers_target
--codegen_numbers.depends = ./../../Telegram/Resources/numbers.txt
--codegen_numbers.commands = ./../codegen/Debug/codegen_numbers "-o./GeneratedFiles" "./../../Telegram/Resources/numbers.txt"
--
 -CONFIG(debug, debug|release) {
--codegen_numbers.commands = cd ../../Telegram && ./../Linux/codegen/Debug/codegen_numbers "-o./../Linux/DebugIntermediate/GeneratedFiles" "./Resources/numbers.txt" && cd ../Linux/DebugIntermediate
+-    codegen_style.target = style_target
+-    codegen_style.depends = FORCE
+-    codegen_style.commands = ./../codegen/Debug/codegen_style "-I./../../Telegram/Resources" "-I./../../Telegram/SourceFiles" "-o./GeneratedFiles/styles" all_files.style --rebuild
+-
+-    codegen_numbers.target = numbers_target
+-    codegen_numbers.depends = ./../../Telegram/Resources/numbers.txt
+-    codegen_numbers.commands = ./../codegen/Debug/codegen_numbers "-o./GeneratedFiles" "./../../Telegram/Resources/numbers.txt"
+-
+-    codegen_numbers.commands = cd ../../Telegram && ./../Linux/codegen/Debug/codegen_numbers "-o./../Linux/DebugIntermediate/GeneratedFiles" "./Resources/numbers.txt" && cd ../Linux/DebugIntermediate
+-
+-    codegen_lang.target = lang_target
+-    codegen_lang.depends = ./../../Telegram/Resources/langs/lang.strings
+-    codegen_lang.commands = mkdir -p ./GeneratedFiles && ./../DebugLang/MetaLang -lang_in ./../../Telegram/Resources/langs/lang.strings -lang_out ./GeneratedFiles/lang_auto
 -}
+-
 -CONFIG(release, debug|release) {
+-    codegen_style.target = style_target
+-    codegen_style.depends = FORCE
+-    codegen_style.commands = ./../codegen/Release/codegen_style "-I./../../Telegram/Resources" "-I./../../Telegram/SourceFiles" "-o./GeneratedFiles/styles" all_files.style --rebuild
+-
+-    codegen_numbers.target = numbers_target
+-    codegen_numbers.depends = ./../../Telegram/Resources/numbers.txt
+-    codegen_numbers.commands = ./../codegen/Release/codegen_numbers "-o./GeneratedFiles" "./../../Telegram/Resources/numbers.txt"
+-
+-    codegen_numbers.commands = cd ../../Telegram && ./../Linux/codegen/Release/codegen_numbers "-o./../Linux/ReleaseIntermediate/GeneratedFiles" "./Resources/numbers.txt" && cd ../Linux/ReleaseIntermediate
+-
+-    codegen_lang.target = lang_target
+-    codegen_lang.depends = ./../../Telegram/Resources/langs/lang.strings
+-    codegen_lang.commands = mkdir -p ./GeneratedFiles && ./../ReleaseLang/MetaLang -lang_in ./../../Telegram/Resources/langs/lang.strings -lang_out ./GeneratedFiles/lang_auto
 -}
 -
--codegen_lang.target = lang_target
--codegen_lang.depends = ./../../Telegram/Resources/langs/lang.strings
--codegen_lang.commands = mkdir -p ./GeneratedFiles && ./../DebugLang/MetaLang -lang_in ./../../Telegram/Resources/langs/lang.strings -lang_out ./GeneratedFiles/lang_auto
+-file_style_basic.target = GeneratedFiles/styles/style_basic.cpp
+-file_style_basic.depends = style_target
+-file_style_basic_types.target = GeneratedFiles/styles/style_basic_types.cpp
+-file_style_basic_types.depends = style_target
+-file_style_overview.target = GeneratedFiles/styles/style_overview.cpp
+-file_style_overview.depends = style_target
+-file_style_dialogs.target = GeneratedFiles/styles/style_dialogs.cpp
+-file_style_dialogs.depends = style_target
+-file_style_history.target = GeneratedFiles/styles/style_history.cpp
+-file_style_history.depends = style_target
+-file_style_profile.target = GeneratedFiles/styles/style_profile.cpp
+-file_style_profile.depends = style_target
 -
--QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang
+-QMAKE_EXTRA_TARGETS += codegen_style codegen_numbers codegen_lang \
+-    file_style_basic file_style_basic_types file_style_overview \
+-    file_style_dialogs file_style_history file_style_profile
 -
 -PRE_TARGETDEPS += style_target numbers_target lang_target
 -
  unix {
      linux-g++:QMAKE_TARGET.arch = $$QMAKE_HOST.arch
      linux-g++-32:QMAKE_TARGET.arch = x86
-@@ -73,7 +53,6 @@ SOURCES += \
+@@ -100,7 +51,6 @@ SOURCES += \
      ./GeneratedFiles/styles/style_overview.cpp \
      ./GeneratedFiles/styles/style_profile.cpp \
      ./SourceFiles/main.cpp \
@@ -238,7 +278,7 @@ Last-Update: 2016-06-18
      ./SourceFiles/apiwrap.cpp \
      ./SourceFiles/app.cpp \
      ./SourceFiles/application.cpp \
-@@ -276,7 +255,7 @@ HEADERS += \
+@@ -307,7 +257,7 @@ HEADERS += \
      ./SourceFiles/core/click_handler_types.h \
      ./SourceFiles/core/observer.h \
      ./SourceFiles/core/vector_of_moveable.h \
@@ -247,8 +287,8 @@ Last-Update: 2016-06-18
      ./SourceFiles/data/data_abstract_structure.h \
      ./SourceFiles/data/data_drafts.h \
      ./SourceFiles/dialogs/dialogs_common.h \
-@@ -385,10 +364,6 @@ HEADERS += \
-   ./SourceFiles/pspecific_mac.h
+@@ -438,10 +388,6 @@ HEADERS += \
+   ./SourceFiles/platform/mac/main_window_mac.h
  }
  
 -SOURCES += \
@@ -258,7 +298,7 @@ Last-Update: 2016-06-18
  CONFIG += precompile_header
  
  PRECOMPILED_HEADER = ./SourceFiles/stdafx.h
-@@ -400,7 +375,7 @@ CONFIG(release, debug|release) {
+@@ -453,7 +399,7 @@ CONFIG(release, debug|release) {
      QMAKE_CXXFLAGS_RELEASE -= -O2
      QMAKE_CXXFLAGS_RELEASE += -Ofast -flto -fno-strict-aliasing -g
      QMAKE_LFLAGS_RELEASE -= -O1
@@ -267,7 +307,7 @@ Last-Update: 2016-06-18
  }
  # Linux 32bit fails Release link with Link-Time Optimization: virtual memory exhausted
  unix {
-@@ -412,41 +387,38 @@ unix {
+@@ -465,41 +411,38 @@ unix {
      }
  }
  CONFIG(debug, debug|release) {
@@ -326,8 +366,8 @@ Last-Update: 2016-06-18
  
  RESOURCES += \
      ./Resources/telegram.qrc \
---- telegram-desktop-0.9.51.orig/Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
-+++ telegram-desktop-0.9.51/Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
+--- telegram-desktop-0.9.56.orig/Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
++++ telegram-desktop-0.9.56/Telegram/build/qmake/codegen_numbers/codegen_numbers.pro
 @@ -7,10 +7,12 @@ CONFIG -= app_bundle
  CONFIG(debug, debug|release) {
      OBJECTS_DIR = ./
@@ -347,8 +387,8 @@ Last-Update: 2016-06-18
  ./../../../SourceFiles/codegen/numbers/processor.h
 +
 +QMAKE_POST_LINK = $$DESTDIR/$$TARGET -o $$OUTPUT ../../../../Telegram/Resources/numbers.txt
---- telegram-desktop-0.9.51.orig/Telegram/build/qmake/codegen_style/codegen_style.pro
-+++ telegram-desktop-0.9.51/Telegram/build/qmake/codegen_style/codegen_style.pro
+--- telegram-desktop-0.9.56.orig/Telegram/build/qmake/codegen_style/codegen_style.pro
++++ telegram-desktop-0.9.56/Telegram/build/qmake/codegen_style/codegen_style.pro
 @@ -7,10 +7,12 @@ CONFIG -= app_bundle
  CONFIG(debug, debug|release) {
      OBJECTS_DIR = ./

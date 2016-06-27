@@ -14,10 +14,6 @@ INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
 INSTALL_SCRIPT  = $(INSTALL) -p    -o root -g root  -m 755
 INSTALL_DIR     = $(INSTALL) -p -d -o root -g root  -m 755
 
-DEB_BUILD_OPTIONS += nounity	# in Ubuntu this line will be removed
-ifneq (,$(filter nounity,$(DEB_BUILD_OPTIONS)))
- QMAKE += DEFINES+=NO_UNITY
-endif
 ifeq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
  QMAKE += -config release
  BUILD_MODE = Release

@@ -1,3 +1,50 @@
+telegram-desktop (0.9.56-1~rc1) unstable; urgency=low
+
+  * Fixed scrolling by a child widget in ScrollArea by touch screen.
+    ScrollArea now always generates MouseMove when scrolled.
+    Fixed crash in BotKeyboard resizing with style change.
+    Fixed stickers box animations.
+  * When hiding fullscreen window first exit fullscreen.
+  * Fixed crash in BotKeyboard resize.
+    Fixed elided single-line Text layout.
+  * Profile members block displayed when mouse is over group members count.
+  * Members block in group conversation view finished.
+  * Added "Add to Group" button in bot profile.
+    Changed new chat icon to more simplified.
+    Fixed kick user from a new members dropdown in chat history view.
+  * Styles improved.
+    Members dropdown is shown with a delay.
+    Overview of chat photos fixed.
+    Tray icon tries read a file on Linux.
+  * Shutdown on Linux fix attempt.
+    Draft remove in empty conversation fix.
+    Larger badge of unread messages in history-to-down button.
+    Submit bot-start by Enter.
+    Fix icons show in chat without input field.
+  * Fix attempt of photo forward by drag-n-drop.
+    Members dropdown area made smaller (only the members/online text rect).
+  * Field autocomplete now replaces text part only up to cursor position.
+    New radial photo load progress in MediaView instead the old 3-dots.
+  * Radial progress in settings when loading a new background from gallery.
+    MediaView handling of screen resolution change fixed.
+    Media messages now display both name/type and caption in dialogs list.
+    When viewing group profile photo delete affects either photo or message.
+  * Selected messages actions (forward, delete, cancel) redesigned.
+  * When updating local online status from user action events we use action
+    timestamp, and ignoring events from getDifference, if no timestamp is
+    available for the specific action.
+    Couple of hidden actions added in Settings.
+  * Creating MediaView after the main window.
+    That way the main window is created with the right size even with
+    FullScreen flag for MediaView.
+  * Fixed dead keys in photo / file caption input field #1418
+    Another attempt to fix dead keys input problem after main window looses
+    focus to popup menu or photo viewer #2007 #1074
+  * Crash fixed in MediaView after logout and login again.
+    Buttons layout improved in bot inline keyboard.
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Mon, 27 Jun 2016 16:18:37 +0300
+
 telegram-desktop (0.9.51-2~rc5) unstable; urgency=low
 
   * Remove big icons
