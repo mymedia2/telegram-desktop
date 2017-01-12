@@ -1,0 +1,11 @@
+telegram-desktop for Debian
+---------------------------
+
+Telegram is secure messenger from Pavel Durov.
+This build yet has known issues:
+ * Poor font is used
+TODO:
+ * build for i386 architecture
+ * Man page
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Thu, 12 Jan 2017 17:41:22 +0300

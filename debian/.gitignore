@@ -1,0 +1,7 @@
+telegram-desktop/
+telegram-desktop.substvars
+telegram-desktop.debhelper.log
+debhelper-build-stamp
+files
+telegram-desktop.postinst.debhelper
+telegram-desktop.postrm.debhelper

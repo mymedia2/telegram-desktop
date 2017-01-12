@@ -79,20 +79,16 @@
     ],
 
     'defines': [
-      'AL_LIBTYPE_STATIC',
+      'TDESKTOP_DISABLE_CRASH_REPORTS',
+      'TDESKTOP_DISABLE_AUTOUPDATE',
+      'TDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME',
       '<!@(python -c "for s in \'<(travis_defines)\'.split(\',\'): print(s)")',
     ],
 
     'include_dirs': [
       '<(src_loc)',
       '<(SHARED_INTERMEDIATE_DIR)',
-      '<(libs_loc)/breakpad/src',
-      '<(libs_loc)/lzma/C',
-      '<(libs_loc)/libexif-0.6.20',
-      '<(libs_loc)/zlib-1.2.8',
-      '<(libs_loc)/ffmpeg',
-      '<(libs_loc)/openal-soft/include',
-      '<(minizip_loc)',
+      '/usr/include/minizip',
       '<(sp_media_key_tap_loc)',
     ],
     'sources': [
@@ -631,13 +627,6 @@
       }],
       [ '"<(build_win)" != "1"', {
         'sources': [
-          '<(minizip_loc)/crypt.h',
-          '<(minizip_loc)/ioapi.c',
-          '<(minizip_loc)/ioapi.h',
-          '<(minizip_loc)/zip.c',
-          '<(minizip_loc)/zip.h',
-          '<(minizip_loc)/unzip.c',
-          '<(minizip_loc)/unzip.h',
         ],
         'sources!': [
           '<(src_loc)/pspecific_win.cpp',

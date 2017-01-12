@@ -333,7 +333,7 @@ TextBlock::TextBlock(const style::font &font, const QString &str, QFixed minResi
 		QStackTextEngine engine(part, blockFont->f);
 		engine.itemize();
 
-		QTextLayout layout(&engine);
+		QTextLayout layout(part, blockFont->f);
 		layout.beginLayout();
 		layout.createLine();
 

@@ -1,0 +1,7 @@
+?package(telegram-desktop): \
+  needs="X11" \
+  section="Applications/Network/Communication"\
+  title="Telegram Desktop" \
+  command="/usr/bin/tdesktop" \
+  icon="/usr/share/pixmaps/telegram.xpm" \
+  longtitle="Official desktop version of Telegram messaging app"

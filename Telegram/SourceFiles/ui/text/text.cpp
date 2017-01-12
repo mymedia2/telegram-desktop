@@ -30,6 +30,43 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "boxes/confirmbox.h"
 #include "mainwindow.h"
 
+// This is a copy from Qt source file qtextengine.cpp for TextPainter::drawLine.
+// Temporary fix it here.
+// TODO: find a dynamic library which contains this methods.
+QTextItemInt::QTextItemInt(const QGlyphLayout &g, QFont *font, const QChar *chars_, int numChars, QFontEngine *fe, const QTextCharFormat &format)
+    : flags(0), justified(false), underlineStyle(QTextCharFormat::NoUnderline), charFormat(format),
+      num_chars(numChars), chars(chars_), logClusters(0), f(font),  glyphs(g), fontEngine(fe)
+{
+}
+
+// Fix up flags and underlineStyle with given info
+void QTextItemInt::initWithScriptItem(const QScriptItem &si)
+{
+    // explicitly initialize flags so that initFontAttributes can be called
+    // multiple times on the same TextItem
+    flags = 0;
+    if (si.analysis.bidiLevel %2)
+        flags |= QTextItem::RightToLeft;
+    ascent = si.ascent;
+    descent = si.descent;
+
+    if (charFormat.hasProperty(QTextFormat::TextUnderlineStyle)) {
+        underlineStyle = charFormat.underlineStyle();
+    } else if (charFormat.boolProperty(QTextFormat::FontUnderline)
+               || f->d->underline) {
+        underlineStyle = QTextCharFormat::SingleUnderline;
+    }
+
+    // compat
+    if (underlineStyle == QTextCharFormat::SingleUnderline)
+        flags |= QTextItem::Underline;
+
+    if (f->d->overline || charFormat.fontOverline())
+        flags |= QTextItem::Overline;
+    if (f->d->strikeOut || charFormat.fontStrikeOut())
+        flags |= QTextItem::StrikeOut;
+}
+
 namespace {
 
 inline int32 countBlockHeight(const ITextBlock *b, const style::TextStyle *st) {

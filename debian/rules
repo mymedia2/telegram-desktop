@@ -1,0 +1,62 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Rules for building Debian package. Based on the follow files:
+#  * doc/building-cmake.md
+#  * Telegram/gyp/refresh.sh
+#  * Telegram/Patches/gyp.diff
+# Please recheck this file if they are changed in future versions.
+
+#export VERBOSE = 1
+#export DH_VERBOSE = 1
+
+DESTDIR = debian/telegram-desktop
+MKDIR = mkdir -p
+RMDIR = $(RM) -r
+INSTALL = install
+INSTALL_FILE    = $(INSTALL) -p    -o root -g root  -m 644
+INSTALL_PROGRAM = $(INSTALL) -p    -o root -g root  -m 755
+INSTALL_SCRIPT  = $(INSTALL) -p    -o root -g root  -m 755
+INSTALL_DIR     = $(INSTALL) -p -d -o root -g root  -m 755
+
+ifeq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
+ BUILD_MODE = Release
+else
+ BUILD_MODE = Debug
+endif
+ifeq (,$(filter nostrip,$(DEB_BUILD_OPTIONS)))
+ INSTALL_PROGRAM += -s
+endif
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+ MAKEFLAGS += -j$(NUMJOBS)
+endif
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# Generate CMakeLists.txt
+	cd Telegram/gyp && \
+	  gyp --depth=. --generator-output=../.. -Goutput_dir=out Telegram.gyp --format=cmake
+	# This makes up for patch of gyp utility. Supporting precompiled headers.
+	# $NUMBER is the number of the penultimate line in the generated CMakeLists.txt file.
+	# The follow sed script inserts two lines into this file before the penultimate line.
+	NUMBER=$$((`cat out/$(BUILD_MODE)/CMakeLists.txt | wc -l` - 1)); \
+	  LINE_ONE='include($${CMAKE_SOURCE_DIR}/../../Telegram/gyp/PrecompiledHeader.cmake)'; \
+	  LINE_TWO='add_precompiled_header(Telegram ../../Telegram/SourceFiles/stdafx.h)'; \
+	  sed -i "$${NUMBER}i$${LINE_ONE}\n$${LINE_TWO}" out/$(BUILD_MODE)/CMakeLists.txt
+	# Configure with CMake
+	cd out/$(BUILD_MODE) && cmake .
+
+override_dh_auto_build:
+	$(MAKE) -C out/$(BUILD_MODE)
+
+override_dh_auto_install:
+	$(INSTALL_DIR) $(DESTDIR)/usr/bin
+	$(INSTALL_PROGRAM) out/$(BUILD_MODE)/Telegram $(DESTDIR)/usr/bin/tdesktop
+
+override_dh_auto_clean:
+	$(RMDIR) out
+
+.PHONY: %

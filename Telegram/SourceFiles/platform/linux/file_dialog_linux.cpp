@@ -27,7 +27,26 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "mainwindow.h"
 #include "localstorage.h"
 
-QStringList qt_make_filter_list(const QString &filter);
+// Copy & paste from qfiledialog.cpp
+// Makes a list of filters from ;;-separated text.
+QStringList qt_make_filter_list(const QString &filter)
+{
+    QString f(filter);
+
+    if (f.isEmpty())
+        return QStringList();
+
+    QString sep(";;");
+    int i = f.indexOf(sep, 0);
+    if (i == -1) {
+        if (f.indexOf("\n", 0) != -1) {
+            sep = "\n";
+            i = f.indexOf(sep, 0);
+        }
+    }
+
+    return f.split(sep);
+}
 
 namespace Platform {
 namespace FileDialog {

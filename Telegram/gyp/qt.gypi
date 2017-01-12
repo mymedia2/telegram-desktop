@@ -27,7 +27,7 @@
               [ 'build_macold', {
                 'qt_version%': '5.3.2',
               }, {
-                'qt_version%': '5.6.2',
+                'qt_version%': '<!(echo /usr/include/x86_64-linux-gnu/qt5/QtCore/*/ | grep -Po "\d+\.\d+\.\d+")',
               }]
             ],
           },
@@ -38,10 +38,9 @@
             'Qt5Network',
             'Qt5Widgets',
             'Qt5Gui',
-            'qtharfbuzzng',
           ],
           'qt_version%': '<(qt_version)',
-          'linux_path_qt%': '/usr/local/tdesktop/Qt-<(qt_version)',
+          'linux_path_qt%': '/usr/lib/x86_64-linux-gnu/qt5',
         },
         'qt_version%': '<(qt_version)',
         'qt_loc_unix': '<(linux_path_qt)',
@@ -79,9 +78,9 @@
             ],
           }],
           [ 'build_linux', {
-            'qt_lib_prefix': 'lib',
-            'qt_lib_debug_postfix': '.a',
-            'qt_lib_release_postfix': '.a',
+            'qt_lib_prefix': '',
+            'qt_lib_debug_postfix': '',
+            'qt_lib_release_postfix': '',
             'qt_libs': [
               'qxcb',
               'Qt5XcbQpa',
@@ -91,7 +90,6 @@
               '<@(qt_libs)',
               'Qt5DBus',
               'Qt5Core',
-              'qtpcre',
               'Xi',
               'Xext',
               'Xfixes',
@@ -103,7 +101,6 @@
               'xcb-shm',
               'xcb-xfixes',
               'xcb-render',
-              'xcb-static',
             ],
           }],
         ],
@@ -130,9 +127,9 @@
     ],
 
     'linux_path_xkbcommon%': '/usr/local',
-    'linux_lib_ssl%': '/usr/local/ssl/lib/libssl.a',
-    'linux_lib_crypto%': '/usr/local/ssl/lib/libcrypto.a',
-    'linux_lib_icu%': '/usr/lib/libicutu.a /usr/lib/libicui18n.a /usr/lib/libicuuc.a /usr/lib/libicudata.a',
+    'linux_lib_ssl%': '/usr/lib/x86_64-linux-gnu/libssl.so',
+    'linux_lib_crypto%': '/usr/lib/x86_64-linux-gnu/libcrypto.so',
+    'linux_lib_icu%': '/usr/lib/x86_64-linux-gnu/libicutu.so /usr/lib/x86_64-linux-gnu/libicui18n.so /usr/lib/x86_64-linux-gnu/libicuuc.so /usr/lib/x86_64-linux-gnu/libicudata.so',
   },
 
   'configurations': {
@@ -181,13 +178,13 @@
   },
 
   'include_dirs': [
-    '<(qt_loc)/include',
-    '<(qt_loc)/include/QtCore',
-    '<(qt_loc)/include/QtGui',
-    '<(qt_loc)/include/QtCore/<(qt_version)',
-    '<(qt_loc)/include/QtGui/<(qt_version)',
-    '<(qt_loc)/include/QtCore/<(qt_version)/QtCore',
-    '<(qt_loc)/include/QtGui/<(qt_version)/QtGui',
+    '/usr/include/x86_64-linux-gnu/qt5',
+    '/usr/include/x86_64-linux-gnu/qt5/QtCore',
+    '/usr/include/x86_64-linux-gnu/qt5/QtGui',
+    '/usr/include/x86_64-linux-gnu/qt5/QtCore/<(qt_version)/',
+    '/usr/include/x86_64-linux-gnu/qt5/QtGui/<(qt_version)/',
+    '/usr/include/x86_64-linux-gnu/qt5/QtCore/<(qt_version)/QtCore',
+    '/usr/include/x86_64-linux-gnu/qt5/QtGui/<(qt_version)/QtGui',
   ],
   'library_dirs': [
     '<(qt_loc)/lib',
@@ -208,7 +205,7 @@
         '<(qt_loc)/plugins/platforminputcontexts',
       ],
       'libraries': [
-        '<(linux_path_xkbcommon)/lib/libxkbcommon.a',
+        '/usr/lib/x86_64-linux-gnu/libxkbcommon.so',
         '<@(qt_libs_release)',
         '<(linux_lib_ssl)',
         '<(linux_lib_crypto)',
@@ -226,7 +223,6 @@
         '<(qt_loc)/mkspecs/linux-g++',
       ],
       'ldflags': [
-        '-static-libstdc++',
         '-pthread',
         '-g',
         '-rdynamic',

@@ -1,0 +1,23 @@
+Source: telegram-desktop
+Section: contrib/net
+Priority: optional
+Maintainer: Nicholas Guriev <guriev-ns@ya.ru>
+Build-Depends: debhelper (>=9.0), cmake (>=3.0), gyp, qtbase5-dev (>=5.6),
+ qtbase5-private-dev (>=5.6), qt5-image-formats-plugins (>=5.6),
+ fcitx-frontend-qt5, libappindicator-dev, libdee-dev, libssl1.0-dev,
+ libavcodec-dev (>=7:3.2), libavformat-dev (>=7:3.2), libswscale-dev (>=7:3.2),
+ libopus-dev (>=1.1), libva-dev, libvdpau-dev, libopenal-dev, liblzma-dev,
+ libminizip-dev (>=1.1), zlib1g-dev (>=1:1.2.8)
+Standards-Version: 3.9.8
+Homepage: https://desktop.telegram.org
+Vcs-Git: https://github.com/telegramdesktop/tdesktop
+Vcs-Browser: https://github.com/telegramdesktop/tdesktop
+
+Package: telegram-desktop
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: official telegram messaging app
+ Telegram is a messaging app with a focus on speed and security, it is
+ super-fast, simple and free. You can use Telegram on all your devices at the
+ same time — your messages sync seamlessly across any number of your phones,
+ tablets or computers.
