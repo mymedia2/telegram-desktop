@@ -2,4 +2,5 @@ Avoid-depending-on-static-libraries.patch
 Flags-for-precompiled-header-and-MOC.patch
 Debian-API-ID.patch
 Remove-useless-flags.patch
+Downgrade-Qt-version.patch
 Fix-FTBFS-everywhere.patch
