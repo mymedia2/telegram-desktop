@@ -1,3 +1,10 @@
+telegram-desktop (1.1.18-1ppa1) xenial; urgency=medium
+
+  * Upload to Launchpad
+  * Bring back a patch to build against Qt 5.5
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Mon, 31 Jul 2017 16:15:27 +0300
+
 telegram-desktop (1.1.18-1) unstable; urgency=medium
 
   * New upstream release
