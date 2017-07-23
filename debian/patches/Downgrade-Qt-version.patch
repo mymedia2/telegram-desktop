@@ -3,10 +3,9 @@ Author: Nicholas Guriev <guriev-ns@ya.ru>
 Forwarded: no
 Last-Update: 2017-03-31
 
-diff --git a/Telegram/SourceFiles/main.cpp b/Telegram/SourceFiles/main.cpp
 --- a/Telegram/SourceFiles/main.cpp
 +++ b/Telegram/SourceFiles/main.cpp
-@@ -23,9 +23,10 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
+@@ -23,9 +23,10 @@ Copyright (c) 2014-2017 John Preston, ht
  #include "storage/localstorage.h"
  
  int main(int argc, char *argv[]) {
@@ -19,10 +18,9 @@ diff --git a/Telegram/SourceFiles/main.cpp b/Telegram/SourceFiles/main.cpp
  	QCoreApplication::setApplicationName(qsl("TelegramDesktop"));
  
  	settingsParseArgs(argc, argv);
-diff --git a/Telegram/SourceFiles/ui/text/text.cpp b/Telegram/SourceFiles/ui/text/text.cpp
 --- a/Telegram/SourceFiles/ui/text/text.cpp
 +++ b/Telegram/SourceFiles/ui/text/text.cpp
-@@ -1692,11 +1692,11 @@ private:
+@@ -1688,11 +1688,11 @@ private:
  		if (item == -1)
  			return;
  
@@ -35,12 +33,11 @@ diff --git a/Telegram/SourceFiles/ui/text/text.cpp b/Telegram/SourceFiles/ui/tex
 -#endif // OS_MAC_OLD
 +#endif
  
- 		int blockIndex = _lineStartBlock;
- 		ITextBlock *currentBlock = _t->_blocks[blockIndex];
-diff --git a/Telegram/SourceFiles/ui/twidget.cpp b/Telegram/SourceFiles/ui/twidget.cpp
+ 		auto blockIndex = _lineStartBlock;
+ 		auto currentBlock = _t->_blocks[blockIndex].get();
 --- a/Telegram/SourceFiles/ui/twidget.cpp
 +++ b/Telegram/SourceFiles/ui/twidget.cpp
-@@ -107,9 +107,9 @@ void sendSynteticMouseEvent(QWidget *widget, QEvent::Type type, Qt::MouseButton
+@@ -191,9 +191,9 @@ void sendSynteticMouseEvent(QWidget *wid
  			, button
  			, QGuiApplication::mouseButtons() | button
  			, QGuiApplication::keyboardModifiers()
