@@ -6,6 +6,11 @@ Files: *
 Copyright: 2014-2017 John Preston <johnprestonmail@gmail.com>
 License: GPL-3.0+ with OpenSSL exception
 
+Files: Telegram/SourceFiles/boxes/mute_settings_box.h
+       Telegram/SourceFiles/boxes/mute_settings_box.cpp
+Copyright: 2017 Nicholas Guriev <guriev-ns@ya.ru>
+License: Public-domain
+
 Files: Telegram/Patches/qtbase_5_6_2.diff
 Copyright: 1985, 1987, 1990, 1998 The Open Group
            1987 Digital Equipment Corporation, Maynard, Massachusetts
@@ -21,7 +26,9 @@ Copyright: 1985, 1987, 1990, 1998 The Open Group
            2013 Ran Benita
 License: GPL-2.0+ and Expat and MIT1 and MIT2 and MIT3
 
-Files: Telegram/Resources/fonts/OpenSans-*.ttf
+Files: Telegram/Resources/fonts/OpenSans-Regular.ttf
+       Telegram/Resources/fonts/OpenSans-Bold.ttf
+       Telegram/Resources/fonts/OpenSans-Semibold.ttf
 Copyright: Steve Matteson
 License: Apache-2.0
 
