@@ -1,3 +1,13 @@
+telegram-desktop (1.1.20-0ppa1) xenial; urgency=medium
+
+  * Upload to Launchpad
+  * New upstream release
+  * Refresh patches
+    - Temporally turn tests off
+    - Bring a patch back to build against Qt 5.5
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Sun, 03 Sep 2017 23:42:34 +0300
+
 telegram-desktop (1.1.19-2) unstable; urgency=medium
 
   * Fix CVE-2016-10351 by applying Fix-Insecure-cWorkingDir-permissions.patch
