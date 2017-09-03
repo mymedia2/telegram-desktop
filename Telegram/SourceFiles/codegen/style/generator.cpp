@@ -748,8 +748,8 @@ int palette::indexOfColor(style::color c) const {\n\
 }\n\
 \n\
 color palette::colorAtIndex(int index) const {\n\
-	t_assert(_ready);\n\
-	t_assert(index >= 0 && index < kCount);\n\
+	Assert(_ready);\n\
+	Assert(index >= 0 && index < kCount);\n\
 	return _colors[index];\n\
 }\n\
 \n\
@@ -1176,10 +1176,7 @@ QByteArray iconMaskValueSize(int width, int height) {
 	QLatin1String sizeTag("SIZE:");
 	result.append(sizeTag.data(), sizeTag.size());
 	{
-		QBuffer buffer(&result);
-		buffer.open(QIODevice::Append);
-
-		QDataStream stream(&buffer);
+		QDataStream stream(&result, QIODevice::Append);
 		stream.setVersion(QDataStream::Qt_5_1);
 		stream << qint32(width) << qint32(height);
 	}

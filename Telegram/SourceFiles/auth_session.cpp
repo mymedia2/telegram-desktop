@@ -23,6 +23,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "apiwrap.h"
 #include "messenger.h"
 #include "storage/file_download.h"
+#include "storage/file_upload.h"
 #include "storage/localstorage.h"
 #include "storage/serialize_common.h"
 #include "window/notifications_manager.h"
@@ -44,20 +45,16 @@ AuthSessionData::Variables::Variables()
 }
 
 QByteArray AuthSessionData::serialize() const {
-	auto size = sizeof(qint32) * 4;
+	auto size = sizeof(qint32) * 8;
 	for (auto i = _variables.soundOverrides.cbegin(), e = _variables.soundOverrides.cend(); i != e; ++i) {
 		size += Serialize::stringSize(i.key()) + Serialize::stringSize(i.value());
 	}
+	size += _variables.groupStickersSectionHidden.size() * sizeof(quint64);
 
 	auto result = QByteArray();
 	result.reserve(size);
 	{
-		QBuffer buffer(&result);
-		if (!buffer.open(QIODevice::WriteOnly)) {
-			Unexpected("Can't open data for AuthSessionData::serialize()");
-		}
-
-		QDataStream stream(&buffer);
+		QDataStream stream(&result, QIODevice::WriteOnly);
 		stream.setVersion(QDataStream::Qt_5_1);
 		stream << static_cast<qint32>(_variables.selectorTab);
 		stream << qint32(_variables.lastSeenWarningSeen ? 1 : 0);
@@ -69,6 +66,10 @@ QByteArray AuthSessionData::serialize() const {
 		stream << qint32(_variables.tabbedSelectorSectionTooltipShown);
 		stream << qint32(_variables.floatPlayerColumn);
 		stream << qint32(_variables.floatPlayerCorner);
+		stream << qint32(_variables.groupStickersSectionHidden.size());
+		for (auto peerId : _variables.groupStickersSectionHidden) {
+			stream << quint64(peerId);
+		}
 	}
 	return result;
 }
@@ -78,12 +79,7 @@ void AuthSessionData::constructFromSerialized(const QByteArray &serialized) {
 		return;
 	}
 
-	auto readonly = serialized;
-	QBuffer buffer(&readonly);
-	if (!buffer.open(QIODevice::ReadOnly)) {
-		Unexpected("Can't open data for DcOptions::constructFromSerialized()");
-	}
-	QDataStream stream(&buffer);
+	QDataStream stream(serialized);
 	stream.setVersion(QDataStream::Qt_5_1);
 	qint32 selectorTab = static_cast<qint32>(ChatHelpers::SelectorTab::Emoji);
 	qint32 lastSeenWarningSeen = 0;
@@ -92,6 +88,7 @@ void AuthSessionData::constructFromSerialized(const QByteArray &serialized) {
 	qint32 floatPlayerColumn = static_cast<qint32>(Window::Column::Second);
 	qint32 floatPlayerCorner = static_cast<qint32>(RectPart::TopRight);
 	QMap<QString, QString> soundOverrides;
+	OrderedSet<PeerId> groupStickersSectionHidden;
 	stream >> selectorTab;
 	stream >> lastSeenWarningSeen;
 	if (!stream.atEnd()) {
@@ -113,6 +110,17 @@ void AuthSessionData::constructFromSerialized(const QByteArray &serialized) {
 	}
 	if (!stream.atEnd()) {
 		stream >> floatPlayerColumn >> floatPlayerCorner;
+	}
+	if (!stream.atEnd()) {
+		auto count = qint32(0);
+		stream >> count;
+		if (stream.status() == QDataStream::Ok) {
+			for (auto i = 0; i != count; ++i) {
+				quint64 peerId;
+				stream >> peerId;
+				groupStickersSectionHidden.insert(peerId);
+			}
+		}
 	}
 	if (stream.status() != QDataStream::Ok) {
 		LOG(("App Error: Bad data for AuthSessionData::constructFromSerialized()"));
@@ -142,6 +150,7 @@ void AuthSessionData::constructFromSerialized(const QByteArray &serialized) {
 	case RectPart::BottomLeft:
 	case RectPart::BottomRight: _variables.floatPlayerCorner = uncheckedCorner; break;
 	}
+	_variables.groupStickersSectionHidden = std::move(groupStickersSectionHidden);
 }
 
 QString AuthSessionData::getSoundPath(const QString &key) const {
@@ -152,12 +161,19 @@ QString AuthSessionData::getSoundPath(const QString &key) const {
 	return qsl(":/sounds/") + key + qsl(".mp3");
 }
 
+AuthSession &Auth() {
+	auto result = Messenger::Instance().authSession();
+	Assert(result != nullptr);
+	return *result;
+}
+
 AuthSession::AuthSession(UserId userId)
 : _userId(userId)
 , _autoLockTimer([this] { checkAutoLock(); })
 , _api(std::make_unique<ApiWrap>(this))
 , _calls(std::make_unique<Calls::Instance>())
 , _downloader(std::make_unique<Storage::Downloader>())
+, _uploader(std::make_unique<Storage::Uploader>())
 , _notifications(std::make_unique<Window::Notifications::System>(this)) {
 	Expects(_userId != 0);
 	_saveDataTimer.setCallback([this] {
@@ -177,18 +193,12 @@ bool AuthSession::Exists() {
 	return false;
 }
 
-AuthSession &AuthSession::Current() {
-	auto result = Messenger::Instance().authSession();
-	t_assert(result != nullptr);
-	return *result;
+UserData *AuthSession::user() const {
+	return App::user(userId());
 }
 
-UserData *AuthSession::CurrentUser() {
-	return App::user(CurrentUserId());
-}
-
-base::Observable<void> &AuthSession::CurrentDownloaderTaskFinished() {
-	return Current().downloader().taskFinished();
+base::Observable<void> &AuthSession::downloaderTaskFinished() {
+	return downloader().taskFinished();
 }
 
 bool AuthSession::validateSelf(const MTPUser &user) {
@@ -201,7 +211,7 @@ bool AuthSession::validateSelf(const MTPUser &user) {
 }
 
 void AuthSession::saveDataDelayed(TimeMs delay) {
-	Expects(this == &AuthSession::Current());
+	Expects(this == &Auth());
 	_saveDataTimer.callOnce(delay);
 }
 

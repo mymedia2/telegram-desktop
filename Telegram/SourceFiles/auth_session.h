@@ -24,6 +24,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 
 namespace Storage {
 class Downloader;
+class Uploader;
 } // namespace Storage
 
 namespace Window {
@@ -54,21 +55,24 @@ public:
 	base::Observable<void> &moreChatsLoaded() {
 		return _moreChatsLoaded;
 	}
+	base::Observable<void> &stickersUpdated() {
+		return _stickersUpdated;
+	}
 	base::Observable<void> &savedGifsUpdated() {
 		return _savedGifsUpdated;
 	}
-	base::Observable<gsl::not_null<History*>> &historyCleared() {
+	base::Observable<not_null<History*>> &historyCleared() {
 		return _historyCleared;
 	}
-	base::Observable<gsl::not_null<const HistoryItem*>> &repaintLogEntry() {
+	base::Observable<not_null<const HistoryItem*>> &repaintLogEntry() {
 		return _repaintLogEntry;
 	}
 	base::Observable<void> &pendingHistoryResize() {
 		return _pendingHistoryResize;
 	}
 	struct ItemVisibilityQuery {
-		gsl::not_null<HistoryItem*> item;
-		gsl::not_null<bool*> isVisible;
+		not_null<HistoryItem*> item;
+		not_null<bool*> isVisible;
 	};
 	base::Observable<ItemVisibilityQuery> &queryItemVisibility() {
 		return _queryItemVisibility;
@@ -129,6 +133,15 @@ public:
 	RectPart floatPlayerCorner() const {
 		return _variables.floatPlayerCorner;
 	}
+	void setGroupStickersSectionHidden(PeerId peerId) {
+		_variables.groupStickersSectionHidden.insert(peerId);
+	}
+	bool isGroupStickersSectionHidden(PeerId peerId) const {
+		return _variables.groupStickersSectionHidden.contains(peerId);
+	}
+	void removeGroupStickersSectionHidden(PeerId peerId) {
+		_variables.groupStickersSectionHidden.remove(peerId);
+	}
 
 private:
 	struct Variables {
@@ -141,20 +154,26 @@ private:
 		QMap<QString, QString> soundOverrides;
 		Window::Column floatPlayerColumn;
 		RectPart floatPlayerCorner;
+		OrderedSet<PeerId> groupStickersSectionHidden;
 	};
 
 	base::Variable<bool> _contactsLoaded = { false };
 	base::Variable<bool> _allChatsLoaded = { false };
 	base::Observable<void> _moreChatsLoaded;
+	base::Observable<void> _stickersUpdated;
 	base::Observable<void> _savedGifsUpdated;
-	base::Observable<gsl::not_null<History*>> _historyCleared;
-	base::Observable<gsl::not_null<const HistoryItem*>> _repaintLogEntry;
+	base::Observable<not_null<History*>> _historyCleared;
+	base::Observable<not_null<const HistoryItem*>> _repaintLogEntry;
 	base::Observable<void> _pendingHistoryResize;
 	base::Observable<ItemVisibilityQuery> _queryItemVisibility;
 	Variables _variables;
 	TimeMs _lastTimeVideoPlayedAt = 0;
 
 };
+
+// One per Messenger.
+class AuthSession;
+AuthSession &Auth();
 
 class AuthSession final : private base::Subscriber {
 public:
@@ -165,25 +184,23 @@ public:
 
 	static bool Exists();
 
-	static AuthSession &Current();
-	static UserId CurrentUserId() {
-		return Current().userId();
-	}
-	static PeerId CurrentUserPeerId() {
-		return peerFromUser(CurrentUserId());
-	}
-	static UserData *CurrentUser();
-
 	UserId userId() const {
 		return _userId;
 	}
+	PeerId userPeerId() const {
+		return peerFromUser(userId());
+	}
+	UserData *user() const;
 	bool validateSelf(const MTPUser &user);
 
 	Storage::Downloader &downloader() {
 		return *_downloader;
 	}
+	Storage::Uploader &uploader() {
+		return *_uploader;
+	}
 
-	static base::Observable<void> &CurrentDownloaderTaskFinished();
+	base::Observable<void> &downloaderTaskFinished();
 
 	Window::Notifications::System &notifications() {
 		return *_notifications;
@@ -205,6 +222,9 @@ public:
 	void checkAutoLock();
 	void checkAutoLockIn(TimeMs time);
 
+	base::Observable<DocumentData*> documentUpdated;
+	base::Observable<std::pair<HistoryItem*, MsgId>> messageIdChanging;
+
 	~AuthSession();
 
 private:
@@ -218,6 +238,7 @@ private:
 	const std::unique_ptr<ApiWrap> _api;
 	const std::unique_ptr<Calls::Instance> _calls;
 	const std::unique_ptr<Storage::Downloader> _downloader;
+	const std::unique_ptr<Storage::Uploader> _uploader;
 	const std::unique_ptr<Window::Notifications::System> _notifications;
 
 };

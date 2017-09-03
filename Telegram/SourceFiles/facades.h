@@ -103,9 +103,8 @@ QPointer<BoxType> show(object_ptr<BoxType> content, ShowLayerOptions options = C
 void hideLayer(bool fast = false);
 void hideSettingsAndLayer(bool fast = false);
 bool isLayerShown();
-bool isMediaViewShown();
 
-void repaintHistoryItem(gsl::not_null<const HistoryItem*> item);
+void repaintHistoryItem(not_null<const HistoryItem*> item);
 void autoplayMediaInlineAsync(const FullMsgId &msgId);
 
 void showPeerProfile(const PeerId &peer);
@@ -147,8 +146,6 @@ inline void showChatsListAsync() {
 	showPeerHistoryAsync(PeerId(0), 0, ShowWay::ClearStack);
 }
 PeerData *getPeerForMouseAction();
-
-bool hideWindowNoQuit();
 
 bool skipPaintEvent(QWidget *widget, QPaintEvent *event);
 
@@ -244,12 +241,14 @@ enum Flags {
 
 namespace Stickers {
 
-constexpr uint64 DefaultSetId = 0; // for backward compatibility
-constexpr uint64 CustomSetId = 0xFFFFFFFFFFFFFFFFULL;
-constexpr uint64 RecentSetId = 0xFFFFFFFFFFFFFFFEULL; // for emoji/stickers panel, should not appear in Sets
-constexpr uint64 NoneSetId = 0xFFFFFFFFFFFFFFFDULL; // for emoji/stickers panel, should not appear in Sets
-constexpr uint64 CloudRecentSetId = 0xFFFFFFFFFFFFFFFCULL; // for cloud-stored recent stickers
-constexpr uint64 FeaturedSetId = 0xFFFFFFFFFFFFFFFBULL; // for emoji/stickers panel, should not appear in Sets
+constexpr auto DefaultSetId = 0; // for backward compatibility
+constexpr auto CustomSetId = 0xFFFFFFFFFFFFFFFFULL;
+constexpr auto RecentSetId = 0xFFFFFFFFFFFFFFFEULL; // for emoji/stickers panel, should not appear in Sets
+constexpr auto NoneSetId = 0xFFFFFFFFFFFFFFFDULL; // for emoji/stickers panel, should not appear in Sets
+constexpr auto CloudRecentSetId = 0xFFFFFFFFFFFFFFFCULL; // for cloud-stored recent stickers
+constexpr auto FeaturedSetId = 0xFFFFFFFFFFFFFFFBULL; // for emoji/stickers panel, should not appear in Sets
+constexpr auto FavedSetId = 0xFFFFFFFFFFFFFFFAULL; // for cloud-stored faved stickers
+constexpr auto MegagroupSetId = 0xFFFFFFFFFFFFFFEFULL; // for setting up megagroup sticker set
 struct Set {
 	Set(uint64 id, uint64 access, const QString &title, const QString &shortName, int32 count, int32 hash, MTPDstickerSet::Flags flags)
 		: id(id)
@@ -276,8 +275,6 @@ inline MTPInputStickerSet inputSetId(const Set &set) {
 	}
 	return MTP_inputStickerSetShortName(MTP_string(set.shortName));
 }
-
-Set *feedSet(const MTPDstickerSet &set);
 
 } // namespace Stickers
 
@@ -330,6 +327,7 @@ DeclareVar(int32, PushChatLimit);
 DeclareVar(int32, SavedGifsLimit);
 DeclareVar(int32, EditTimeLimit);
 DeclareVar(int32, StickersRecentLimit);
+DeclareVar(int32, StickersFavedLimit);
 DeclareVar(int32, PinnedDialogsCountMax);
 DeclareVar(QString, InternalLinksDomain);
 DeclareVar(int32, CallReceiveTimeoutMs);
@@ -349,6 +347,7 @@ DeclareVar(Stickers::Sets, StickerSets);
 DeclareVar(Stickers::Order, StickerSetsOrder);
 DeclareVar(TimeMs, LastStickersUpdate);
 DeclareVar(TimeMs, LastRecentStickersUpdate);
+DeclareVar(TimeMs, LastFavedStickersUpdate);
 DeclareVar(Stickers::Order, FeaturedStickerSetsOrder);
 DeclareVar(int, FeaturedStickerSetsUnreadCount);
 DeclareRefVar(base::Observable<void>, FeaturedStickerSetsUnreadCountChanged);

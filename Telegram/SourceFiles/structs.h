@@ -271,15 +271,15 @@ class PeerData;
 
 class PeerClickHandler : public ClickHandler {
 public:
-	PeerClickHandler(gsl::not_null<PeerData*> peer);
+	PeerClickHandler(not_null<PeerData*> peer);
 	void onClick(Qt::MouseButton button) const override;
 
-	gsl::not_null<PeerData*> peer() const {
+	not_null<PeerData*> peer() const {
 		return _peer;
 	}
 
 private:
-	gsl::not_null<PeerData*> _peer;
+	not_null<PeerData*> _peer;
 
 };
 
@@ -478,7 +478,7 @@ public:
 
 	uint64 access = 0;
 
-	MTPDuser::Flags flags = { 0 };
+	MTPDuser::Flags flags = 0;
 	bool isVerified() const {
 		return flags & MTPDuser::Flag::f_verified;
 	}
@@ -562,9 +562,7 @@ public:
 	QString restrictionReason() const override {
 		return _restrictionReason;
 	}
-	void setRestrictionReason(const QString &reason) {
-		_restrictionReason = reason;
-	}
+	void setRestrictionReason(const QString &reason);
 
 	int commonChatsCount() const {
 		return _commonChatsCount;
@@ -642,11 +640,11 @@ public:
 	bool isMigrated() const {
 		return flags & MTPDchat::Flag::f_migrated_to;
 	}
-	QMap<gsl::not_null<UserData*>, int> participants;
-	OrderedSet<gsl::not_null<UserData*>> invitedByMe;
-	OrderedSet<gsl::not_null<UserData*>> admins;
-	QList<gsl::not_null<UserData*>> lastAuthors;
-	OrderedSet<gsl::not_null<PeerData*>> markupSenders;
+	QMap<not_null<UserData*>, int> participants;
+	OrderedSet<not_null<UserData*>> invitedByMe;
+	OrderedSet<not_null<UserData*>> admins;
+	QList<not_null<UserData*>> lastAuthors;
+	OrderedSet<not_null<PeerData*>> markupSenders;
 	int botStatus = 0; // -1 - no bots, 0 - unknown, 1 - one bot, that sees all history, 2 - other
 //	ImagePtr photoFull;
 
@@ -740,16 +738,17 @@ struct MegagroupInfo {
 		}
 		MTPChannelBannedRights rights;
 	};
-	QList<gsl::not_null<UserData*>> lastParticipants;
-	QMap<gsl::not_null<UserData*>, Admin> lastAdmins;
-	QMap<gsl::not_null<UserData*>, Restricted> lastRestricted;
-	OrderedSet<gsl::not_null<PeerData*>> markupSenders;
-	OrderedSet<gsl::not_null<UserData*>> bots;
+	QList<not_null<UserData*>> lastParticipants;
+	QMap<not_null<UserData*>, Admin> lastAdmins;
+	QMap<not_null<UserData*>, Restricted> lastRestricted;
+	OrderedSet<not_null<PeerData*>> markupSenders;
+	OrderedSet<not_null<UserData*>> bots;
 
 	UserData *creator = nullptr; // nullptr means unknown
 	int botStatus = 0; // -1 - no bots, 0 - unknown, 1 - one bot, that sees all history, 2 - other
 	MsgId pinnedMsgId = 0;
 	bool joinedMessageFound = false;
+	MTPInputStickerSet stickerSet = MTP_inputStickerSetEmpty();
 
 	enum LastParticipantsStatus {
 		LastParticipantsUpToDate       = 0x00,
@@ -760,6 +759,7 @@ struct MegagroupInfo {
 	int lastParticipantsCount = 0;
 
 	ChatData *migrateFromPtr = nullptr;
+
 };
 
 class ChannelData : public PeerData {
@@ -826,13 +826,13 @@ public:
 	static bool IsRestrictedForever(TimeId until) {
 		return !until || (until == kRestrictUntilForever);
 	}
-	void applyEditAdmin(gsl::not_null<UserData*> user, const MTPChannelAdminRights &oldRights, const MTPChannelAdminRights &newRights);
-	void applyEditBanned(gsl::not_null<UserData*> user, const MTPChannelBannedRights &oldRights, const MTPChannelBannedRights &newRights);
+	void applyEditAdmin(not_null<UserData*> user, const MTPChannelAdminRights &oldRights, const MTPChannelAdminRights &newRights);
+	void applyEditBanned(not_null<UserData*> user, const MTPChannelBannedRights &oldRights, const MTPChannelBannedRights &newRights);
 
 	int32 date = 0;
 	int version = 0;
-	MTPDchannel::Flags flags = { 0 };
-	MTPDchannelFull::Flags flagsFull = { 0 };
+	MTPDchannel::Flags flags = 0;
+	MTPDchannelFull::Flags flagsFull = 0;
 	std::unique_ptr<MegagroupInfo> mgInfo;
 	bool lastParticipantsCountOutdated() const {
 		if (!mgInfo || !(mgInfo->lastParticipantsStatus & MegagroupInfo::LastParticipantsCountOutdated)) {
@@ -922,12 +922,15 @@ public:
 	bool canEditUsername() const {
 		return amCreator() && (flagsFull & MTPDchannelFull::Flag::f_can_set_username);
 	}
+	bool canEditStickers() const {
+		return (flagsFull & MTPDchannelFull::Flag::f_can_set_stickers);
+	}
 	bool canDelete() const {
 		constexpr auto kDeleteChannelMembersLimit = 1000;
 		return amCreator() && (membersCount() <= kDeleteChannelMembersLimit);
 	}
-	bool canEditAdmin(gsl::not_null<UserData*> user) const;
-	bool canRestrictUser(gsl::not_null<UserData*> user) const;
+	bool canEditAdmin(not_null<UserData*> user) const;
+	bool canRestrictUser(not_null<UserData*> user) const;
 
 	void setInviteLink(const QString &newInviteLink);
 	QString inviteLink() const {
@@ -980,12 +983,10 @@ public:
 	QString restrictionReason() const override {
 		return _restrictionReason;
 	}
-	void setRestrictionReason(const QString &reason) {
-		_restrictionReason = reason;
-	}
+	void setRestrictionReason(const QString &reason);
 
 private:
-	bool canNotEditLastAdmin(gsl::not_null<UserData*> user) const;
+	bool canNotEditLastAdmin(not_null<UserData*> user) const;
 
 	PtsWaiter _ptsWaiter;
 
@@ -1142,9 +1143,9 @@ private:
 
 class PhotoClickHandler : public LeftButtonClickHandler {
 public:
-	PhotoClickHandler(gsl::not_null<PhotoData*> photo, PeerData *peer = nullptr) : _photo(photo), _peer(peer) {
+	PhotoClickHandler(not_null<PhotoData*> photo, PeerData *peer = nullptr) : _photo(photo), _peer(peer) {
 	}
-	gsl::not_null<PhotoData*> photo() const {
+	not_null<PhotoData*> photo() const {
 		return _photo;
 	}
 	PeerData *peer() const {
@@ -1152,7 +1153,7 @@ public:
 	}
 
 private:
-	gsl::not_null<PhotoData*> _photo;
+	not_null<PhotoData*> _photo;
 	PeerData *_peer;
 
 };

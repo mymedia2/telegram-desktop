@@ -34,6 +34,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "lang/lang_keys.h"
 #include "mainwindow.h"
 #include "observer_peer.h"
+#include "apiwrap.h"
 
 namespace ChatHelpers {
 namespace {
@@ -84,24 +85,24 @@ void TabbedSelector::SlideAnimation::setFinalImages(Direction direction, QImage 
 	_leftImage = QPixmap::fromImage(std::move(left).convertToFormat(QImage::Format_ARGB32_Premultiplied), Qt::ColorOnly);
 	_rightImage = QPixmap::fromImage(std::move(right).convertToFormat(QImage::Format_ARGB32_Premultiplied), Qt::ColorOnly);
 
-	t_assert(!_leftImage.isNull());
-	t_assert(!_rightImage.isNull());
+	Assert(!_leftImage.isNull());
+	Assert(!_rightImage.isNull());
 	_width = _leftImage.width();
 	_height = _rightImage.height();
-	t_assert(!(_width % cIntRetinaFactor()));
-	t_assert(!(_height % cIntRetinaFactor()));
-	t_assert(_leftImage.devicePixelRatio() == _rightImage.devicePixelRatio());
-	t_assert(_rightImage.width() == _width);
-	t_assert(_rightImage.height() == _height);
-	t_assert(QRect(0, 0, _width, _height).contains(inner));
+	Assert(!(_width % cIntRetinaFactor()));
+	Assert(!(_height % cIntRetinaFactor()));
+	Assert(_leftImage.devicePixelRatio() == _rightImage.devicePixelRatio());
+	Assert(_rightImage.width() == _width);
+	Assert(_rightImage.height() == _height);
+	Assert(QRect(0, 0, _width, _height).contains(inner));
 	_innerLeft = inner.x();
 	_innerTop = inner.y();
 	_innerWidth = inner.width();
 	_innerHeight = inner.height();
-	t_assert(!(_innerLeft % cIntRetinaFactor()));
-	t_assert(!(_innerTop % cIntRetinaFactor()));
-	t_assert(!(_innerWidth % cIntRetinaFactor()));
-	t_assert(!(_innerHeight % cIntRetinaFactor()));
+	Assert(!(_innerLeft % cIntRetinaFactor()));
+	Assert(!(_innerTop % cIntRetinaFactor()));
+	Assert(!(_innerWidth % cIntRetinaFactor()));
+	Assert(!(_innerHeight % cIntRetinaFactor()));
 	_innerRight = _innerLeft + _innerWidth;
 	_innerBottom = _innerTop + _innerHeight;
 
@@ -117,13 +118,13 @@ void TabbedSelector::SlideAnimation::setFinalImages(Direction direction, QImage 
 }
 
 void TabbedSelector::SlideAnimation::start() {
-	t_assert(!_leftImage.isNull());
-	t_assert(!_rightImage.isNull());
+	Assert(!_leftImage.isNull());
+	Assert(!_rightImage.isNull());
 	RoundShadowAnimation::start(_width, _height, _leftImage.devicePixelRatio());
 	auto checkCorner = [this](const Corner &corner) {
 		if (!corner.valid()) return;
-		t_assert(corner.width <= _innerWidth);
-		t_assert(corner.height <= _innerHeight);
+		Assert(corner.width <= _innerWidth);
+		Assert(corner.height <= _innerHeight);
 	};
 	checkCorner(_topLeft);
 	checkCorner(_topRight);
@@ -284,7 +285,7 @@ void TabbedSelector::Tab::saveScrollTop() {
 	_scrollTop = widget()->getVisibleTop();
 }
 
-TabbedSelector::TabbedSelector(QWidget *parent, gsl::not_null<Window::Controller*> controller) : TWidget(parent)
+TabbedSelector::TabbedSelector(QWidget *parent, not_null<Window::Controller*> controller) : TWidget(parent)
 , _tabsSlider(this, st::emojiTabs)
 , _topShadow(this, st::shadowFg)
 , _bottomShadow(this, st::shadowFg)
@@ -294,7 +295,7 @@ TabbedSelector::TabbedSelector(QWidget *parent, gsl::not_null<Window::Controller
 	Tab { SelectorTab::Stickers, object_ptr<StickersListWidget>(this, controller) },
 	Tab { SelectorTab::Gifs, object_ptr<GifsListWidget>(this, controller) },
 } }
-, _currentTabType(AuthSession::Current().data().selectorTab()) {
+, _currentTabType(Auth().data().selectorTab()) {
 	resize(st::emojiPanWidth, st::emojiPanMaxHeight);
 
 	for (auto &tab : _tabs) {
@@ -486,7 +487,7 @@ void TabbedSelector::hideFinished() {
 }
 
 void TabbedSelector::showStarted() {
-	emit updateStickers();
+	Auth().api().updateStickers();
 	currentTab()->widget()->refreshRecent();
 	currentTab()->widget()->preloadImages();
 	_a_slide.finish();
@@ -516,6 +517,10 @@ void TabbedSelector::afterShown() {
 void TabbedSelector::stickersInstalled(uint64 setId) {
 	_tabsSlider->setActiveSection(static_cast<int>(SelectorTab::Stickers));
 	stickers()->showStickerSet(setId);
+}
+
+void TabbedSelector::showMegagroupSet(ChannelData *megagroup) {
+	stickers()->showMegagroupSet(megagroup);
 }
 
 void TabbedSelector::setCurrentPeer(PeerData *peer) {
@@ -612,7 +617,7 @@ bool TabbedSelector::hasSectionIcons() const {
 
 void TabbedSelector::switchTab() {
 	auto tab = _tabsSlider->activeSection();
-	t_assert(tab >= 0 && tab < Tab::kCount);
+	Assert(tab >= 0 && tab < Tab::kCount);
 	auto newTabType = static_cast<SelectorTab>(tab);
 	if (_currentTabType == newTabType) {
 		return;
@@ -660,19 +665,19 @@ void TabbedSelector::switchTab() {
 	_a_slide.start([this] { update(); }, 0., 1., st::emojiPanSlideDuration, anim::linear);
 	update();
 
-	AuthSession::Current().data().setSelectorTab(_currentTabType);
-	AuthSession::Current().saveDataDelayed(kSaveChosenTabTimeout);
+	Auth().data().setSelectorTab(_currentTabType);
+	Auth().saveDataDelayed(kSaveChosenTabTimeout);
 }
 
-gsl::not_null<EmojiListWidget*> TabbedSelector::emoji() const {
+not_null<EmojiListWidget*> TabbedSelector::emoji() const {
 	return static_cast<EmojiListWidget*>(getTab(SelectorTab::Emoji)->widget().get());
 }
 
-gsl::not_null<StickersListWidget*> TabbedSelector::stickers() const {
+not_null<StickersListWidget*> TabbedSelector::stickers() const {
 	return static_cast<StickersListWidget*>(getTab(SelectorTab::Stickers)->widget().get());
 }
 
-gsl::not_null<GifsListWidget*> TabbedSelector::gifs() const {
+not_null<GifsListWidget*> TabbedSelector::gifs() const {
 	return static_cast<GifsListWidget*>(getTab(SelectorTab::Gifs)->widget().get());
 }
 
@@ -692,7 +697,7 @@ void TabbedSelector::scrollToY(int y) {
 	_topShadow->update();
 }
 
-TabbedSelector::Inner::Inner(QWidget *parent, gsl::not_null<Window::Controller*> controller) : TWidget(parent)
+TabbedSelector::Inner::Inner(QWidget *parent, not_null<Window::Controller*> controller) : TWidget(parent)
 , _controller(controller) {
 }
 

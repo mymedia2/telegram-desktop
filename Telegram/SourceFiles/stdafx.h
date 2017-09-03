@@ -56,10 +56,30 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include <QtWidgets/QtWidgets>
 #include <QtNetwork/QtNetwork>
 
+#include <array>
+#include <vector>
+#include <set>
+#include <map>
+#include <algorithm>
+#include <memory>
+
+// Ensures/Expects.
+#include <gsl/gsl_assert>
+
+// Redefine Ensures/Expects by our own assertions.
+#include "base/assertion.h"
+
+#include <gsl/gsl>
+
+#include "base/variant.h"
+#include "base/optional.h"
+#include "base/algorithm.h"
+
 #include "core/basic_types.h"
 #include "logs.h"
 #include "core/utils.h"
 #include "base/lambda.h"
+#include "base/lambda_guard.h"
 #include "config.h"
 
 #include "mtproto/facade.h"

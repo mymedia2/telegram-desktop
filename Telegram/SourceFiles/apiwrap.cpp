@@ -34,6 +34,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "window/themes/window_theme.h"
 #include "window/notifications_manager.h"
 #include "chat_helpers/message_field.h"
+#include "chat_helpers/stickers.h"
 
 namespace {
 
@@ -41,10 +42,14 @@ constexpr auto kReloadChannelMembersTimeout = 1000; // 1 second wait before relo
 constexpr auto kSaveCloudDraftTimeout = 1000; // save draft to the cloud with 1 sec extra delay
 constexpr auto kSaveDraftBeforeQuitTimeout = 1500; // give the app 1.5 secs to save drafts to cloud when quitting
 constexpr auto kSmallDelayMs = 5;
+constexpr auto kStickersUpdateTimeout = 3600000; // update not more than once in an hour
+constexpr auto kUnreadMentionsPreloadIfLess = 5;
+constexpr auto kUnreadMentionsFirstRequestLimit = 10;
+constexpr auto kUnreadMentionsNextRequestLimit = 100;
 
 } // namespace
 
-ApiWrap::ApiWrap(gsl::not_null<AuthSession*> session)
+ApiWrap::ApiWrap(not_null<AuthSession*> session)
 : _session(session)
 , _messageDataResolveDelayed([this] { resolveMessageDatas(); })
 , _webPagesTimer([this] { resolveWebPages(); })
@@ -278,7 +283,7 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 			return;
 		}
 		auto &f = d.vfull_chat.c_chatFull();
-		App::feedParticipants(f.vparticipants, false, false);
+		App::feedParticipants(f.vparticipants, false);
 		auto &v = f.vbot_info.v;
 		for_const (auto &item, v) {
 			switch (item.type()) {
@@ -286,7 +291,6 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 				auto &b = item.c_botInfo();
 				if (auto user = App::userLoaded(b.vuser_id.v)) {
 					user->setBotInfo(item);
-					App::clearPeerUpdated(user);
 					fullPeerUpdated().notify(user);
 				}
 			} break;
@@ -311,6 +315,7 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 
 		auto canViewAdmins = channel->canViewAdmins();
 		auto canViewMembers = channel->canViewMembers();
+		auto canEditStickers = channel->canEditStickers();
 
 		channel->flagsFull = f.vflags.v;
 		if (auto photo = App::feedPhoto(f.vchat_photo)) {
@@ -345,7 +350,6 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 			}
 			if (updatedTo) {
 				Notify::migrateUpdated(cfrom);
-				App::main()->peerUpdated(cfrom);
 			}
 		}
 		auto &v = f.vbot_info.v;
@@ -355,7 +359,6 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 				auto &b = item.c_botInfo();
 				if (auto user = App::userLoaded(b.vuser_id.v)) {
 					user->setBotInfo(item);
-					App::clearPeerUpdated(user);
 					fullPeerUpdated().notify(user);
 				}
 			} break;
@@ -380,11 +383,25 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 			} else {
 				channel->mgInfo->pinnedMsgId = 0;
 			}
+
+			auto stickersChanged = (canEditStickers != channel->canEditStickers());
+			auto stickerSet = (f.has_stickerset() ? &f.vstickerset.c_stickerSet() : nullptr);
+			auto newSetId = (stickerSet ? stickerSet->vid.v : 0);
+			auto oldSetId = (channel->mgInfo->stickerSet.type() == mtpc_inputStickerSetID) ? channel->mgInfo->stickerSet.c_inputStickerSetID().vid.v : 0;
+			if (oldSetId != newSetId) {
+				channel->mgInfo->stickerSet = stickerSet ? MTP_inputStickerSetID(stickerSet->vid, stickerSet->vaccess_hash) : MTP_inputStickerSetEmpty();
+				stickersChanged = true;
+			}
+			if (stickersChanged) {
+				Notify::peerUpdatedDelayed(channel, Notify::PeerUpdate::Flag::ChannelStickersChanged);
+			}
 		}
 		channel->fullUpdated();
 
 		if (canViewAdmins != channel->canViewAdmins()
-			|| canViewMembers != channel->canViewMembers()) Notify::peerUpdatedDelayed(channel, Notify::PeerUpdate::Flag::ChannelRightsChanged);
+			|| canViewMembers != channel->canViewMembers()) {
+			Notify::peerUpdatedDelayed(channel, Notify::PeerUpdate::Flag::ChannelRightsChanged);
+		}
 
 		notifySettingReceived(MTP_inputNotifyPeer(peer->input), f.vnotify_settings);
 	}
@@ -403,7 +420,6 @@ void ApiWrap::gotChatFull(PeerData *peer, const MTPmessages_ChatFull &result, mt
 		}
 		requestPeer(peer);
 	}
-	App::clearPeerUpdated(peer);
 	fullPeerUpdated().notify(peer);
 }
 
@@ -435,7 +451,6 @@ void ApiWrap::gotUserFull(UserData *user, const MTPUserFull &result, mtpRequestI
 			_fullPeerRequests.erase(i);
 		}
 	}
-	App::clearPeerUpdated(user);
 	fullPeerUpdated().notify(user);
 }
 
@@ -803,7 +818,7 @@ void ApiWrap::saveStickerSets(const Stickers::Order &localOrder, const Stickers:
 	request(base::take(_stickersReorderRequestId)).cancel();
 	request(base::take(_stickersClearRecentRequestId)).cancel();
 
-	auto writeInstalled = true, writeRecent = false, writeCloudRecent = false, writeArchived = false;
+	auto writeInstalled = true, writeRecent = false, writeCloudRecent = false, writeFaved = false, writeArchived = false;
 	auto &recent = cGetRecentStickers();
 	auto &sets = Global::RefStickerSets();
 
@@ -909,7 +924,8 @@ void ApiWrap::saveStickerSets(const Stickers::Order &localOrder, const Stickers:
 	if (writeRecent) Local::writeUserSettings();
 	if (writeArchived) Local::writeArchivedStickers();
 	if (writeCloudRecent) Local::writeRecentStickers();
-	emit App::main()->stickersUpdated();
+	if (writeFaved) Local::writeFavedStickers();
+	Auth().data().stickersUpdated().notify(true);
 
 	if (_stickerSetDisenableRequests.isEmpty()) {
 		stickersSaveOrder();
@@ -965,7 +981,6 @@ void ApiWrap::blockUser(UserData *user) {
 		auto requestId = request(MTPcontacts_Block(user->inputUser)).done([this, user](const MTPBool &result) {
 			_blockRequests.remove(user);
 			user->setBlockStatus(UserData::BlockStatus::Blocked);
-			emit App::main()->peerUpdated(user);
 		}).fail([this, user](const RPCError &error) {
 			_blockRequests.remove(user);
 		}).send();
@@ -981,7 +996,6 @@ void ApiWrap::unblockUser(UserData *user) {
 		auto requestId = request(MTPcontacts_Unblock(user->inputUser)).done([this, user](const MTPBool &result) {
 			_blockRequests.remove(user);
 			user->setBlockStatus(UserData::BlockStatus::NotBlocked);
-			emit App::main()->peerUpdated(user);
 		}).fail([this, user](const RPCError &error) {
 			_blockRequests.remove(user);
 		}).send();
@@ -1130,7 +1144,7 @@ void ApiWrap::handlePrivacyChange(mtpTypeId keyTypeId, const MTPVector<MTPPrivac
 		_contactsStatusesRequestId = request(MTPcontacts_GetStatuses()).done([this](const MTPVector<MTPContactStatus> &result) {
 			_contactsStatusesRequestId = 0;
 			for_const (auto &item, result.v) {
-				t_assert(item.type() == mtpc_contactStatus);
+				Assert(item.type() == mtpc_contactStatus);
 				auto &data = item.c_contactStatus();
 				if (auto user = App::userLoaded(data.vuser_id.v)) {
 					auto oldOnlineTill = user->onlineTill;
@@ -1257,101 +1271,7 @@ PeerData *ApiWrap::notifySettingReceived(MTPInputNotifyPeer notifyPeer, const MT
 
 void ApiWrap::gotStickerSet(uint64 setId, const MTPmessages_StickerSet &result) {
 	_stickerSetRequests.remove(setId);
-
-	if (result.type() != mtpc_messages_stickerSet) return;
-	auto &d(result.c_messages_stickerSet());
-
-	if (d.vset.type() != mtpc_stickerSet) return;
-	auto &s(d.vset.c_stickerSet());
-
-	auto &sets = Global::RefStickerSets();
-	auto it = sets.find(setId);
-	if (it == sets.cend()) return;
-
-	it->access = s.vaccess_hash.v;
-	it->hash = s.vhash.v;
-	it->shortName = qs(s.vshort_name);
-	it->title = stickerSetTitle(s);
-	auto clientFlags = it->flags & (MTPDstickerSet_ClientFlag::f_featured | MTPDstickerSet_ClientFlag::f_unread | MTPDstickerSet_ClientFlag::f_not_loaded | MTPDstickerSet_ClientFlag::f_special);
-	it->flags = s.vflags.v | clientFlags;
-	it->flags &= ~MTPDstickerSet_ClientFlag::f_not_loaded;
-
-	auto &d_docs = d.vdocuments.v;
-	auto custom = sets.find(Stickers::CustomSetId);
-
-	StickerPack pack;
-	pack.reserve(d_docs.size());
-	for (int32 i = 0, l = d_docs.size(); i != l; ++i) {
-		DocumentData *doc = App::feedDocument(d_docs.at(i));
-		if (!doc || !doc->sticker()) continue;
-
-		pack.push_back(doc);
-		if (custom != sets.cend()) {
-			int32 index = custom->stickers.indexOf(doc);
-			if (index >= 0) {
-				custom->stickers.removeAt(index);
-			}
-		}
-	}
-	if (custom != sets.cend() && custom->stickers.isEmpty()) {
-		sets.erase(custom);
-		custom = sets.end();
-	}
-
-	bool writeRecent = false;
-	RecentStickerPack &recent(cGetRecentStickers());
-	for (RecentStickerPack::iterator i = recent.begin(); i != recent.cend();) {
-		if (it->stickers.indexOf(i->first) >= 0 && pack.indexOf(i->first) < 0) {
-			i = recent.erase(i);
-			writeRecent = true;
-		} else {
-			++i;
-		}
-	}
-
-	if (pack.isEmpty()) {
-		int removeIndex = Global::StickerSetsOrder().indexOf(setId);
-		if (removeIndex >= 0) Global::RefStickerSetsOrder().removeAt(removeIndex);
-		sets.erase(it);
-	} else {
-		it->stickers = pack;
-		it->emoji.clear();
-		auto &v = d.vpacks.v;
-		for (auto i = 0, l = v.size(); i != l; ++i) {
-			if (v[i].type() != mtpc_stickerPack) continue;
-
-			auto &pack = v[i].c_stickerPack();
-			if (auto emoji = Ui::Emoji::Find(qs(pack.vemoticon))) {
-				emoji = emoji->original();
-				auto &stickers = pack.vdocuments.v;
-
-				StickerPack p;
-				p.reserve(stickers.size());
-				for (auto j = 0, c = stickers.size(); j != c; ++j) {
-					auto doc = App::document(stickers[j].v);
-					if (!doc || !doc->sticker()) continue;
-
-					p.push_back(doc);
-				}
-				it->emoji.insert(emoji, p);
-			}
-		}
-	}
-
-	if (writeRecent) {
-		Local::writeUserSettings();
-	}
-
-	if (it->flags & MTPDstickerSet::Flag::f_installed) {
-		if (!(it->flags & MTPDstickerSet::Flag::f_archived)) {
-			Local::writeInstalledStickers();
-		}
-	}
-	if (it->flags & MTPDstickerSet_ClientFlag::f_featured) {
-		Local::writeFeaturedStickers();
-	}
-
-	if (App::main()) emit App::main()->stickersUpdated();
+	Stickers::FeedSetFull(result);
 }
 
 void ApiWrap::requestWebPageDelayed(WebPageData *page) {
@@ -1528,9 +1448,155 @@ void ApiWrap::stickersSaveOrder() {
 		}).fail([this](const RPCError &error) {
 			_stickersReorderRequestId = 0;
 			Global::SetLastStickersUpdate(0);
-			App::main()->updateStickers();
+			updateStickers();
 		}).send();
 	}
+}
+
+void ApiWrap::updateStickers() {
+	auto now = getms(true);
+	requestStickers(now);
+	requestRecentStickers(now);
+	requestFavedStickers(now);
+	requestFeaturedStickers(now);
+	requestSavedGifs(now);
+}
+
+void ApiWrap::setGroupStickerSet(not_null<ChannelData*> megagroup, const MTPInputStickerSet &set) {
+	Expects(megagroup->mgInfo != nullptr);
+	megagroup->mgInfo->stickerSet = set;
+	request(MTPchannels_SetStickers(megagroup->inputChannel, set)).send();
+	Auth().data().stickersUpdated().notify(true);
+}
+
+void ApiWrap::requestStickers(TimeId now) {
+	if (Global::LastStickersUpdate() != 0 && now < Global::LastStickersUpdate() + kStickersUpdateTimeout) {
+		return;
+	}
+	if (_stickersUpdateRequest) {
+		return;
+	}
+	auto onDone = [this](const MTPmessages_AllStickers &result) {
+		Global::SetLastStickersUpdate(getms(true));
+		_stickersUpdateRequest = 0;
+
+		switch (result.type()) {
+		case mtpc_messages_allStickersNotModified: return;
+		case mtpc_messages_allStickers: {
+			auto &d = result.c_messages_allStickers();
+			Stickers::SetsReceived(d.vsets.v, d.vhash.v);
+		} return;
+		default: Unexpected("Type in ApiWrap::stickersDone()");
+		}
+	};
+	_stickersUpdateRequest = request(MTPmessages_GetAllStickers(MTP_int(Local::countStickersHash(true)))).done(onDone).fail([this, onDone](const RPCError &error) {
+		LOG(("App Fail: Failed to get stickers!"));
+		onDone(MTP_messages_allStickersNotModified());
+	}).send();
+}
+
+void ApiWrap::requestRecentStickers(TimeId now) {
+	if (Global::LastRecentStickersUpdate() != 0 && now < Global::LastRecentStickersUpdate() + kStickersUpdateTimeout) {
+		return;
+	}
+	if (_recentStickersUpdateRequest) {
+		return;
+	}
+	auto onDone = [this](const MTPmessages_RecentStickers &result) {
+		Global::SetLastRecentStickersUpdate(getms(true));
+		_recentStickersUpdateRequest = 0;
+
+		switch (result.type()) {
+		case mtpc_messages_recentStickersNotModified: return;
+		case mtpc_messages_recentStickers: {
+			auto &d = result.c_messages_recentStickers();
+			Stickers::SpecialSetReceived(Stickers::CloudRecentSetId, lang(lng_recent_stickers), d.vstickers.v, d.vhash.v);
+		} return;
+		default: Unexpected("Type in ApiWrap::recentStickersDone()");
+		}
+	};
+	_recentStickersUpdateRequest = request(MTPmessages_GetRecentStickers(MTP_flags(0), MTP_int(Local::countRecentStickersHash()))).done(onDone).fail([this, onDone](const RPCError &error) {
+		LOG(("App Fail: Failed to get recent stickers!"));
+		onDone(MTP_messages_recentStickersNotModified());
+	}).send();
+}
+
+void ApiWrap::requestFavedStickers(TimeId now) {
+	if (Global::LastFavedStickersUpdate() != 0 && now < Global::LastFavedStickersUpdate() + kStickersUpdateTimeout) {
+		return;
+	}
+	if (_favedStickersUpdateRequest) {
+		return;
+	}
+	auto onDone = [this](const MTPmessages_FavedStickers &result) {
+		Global::SetLastFavedStickersUpdate(getms(true));
+		_favedStickersUpdateRequest = 0;
+
+		switch (result.type()) {
+		case mtpc_messages_favedStickersNotModified: return;
+		case mtpc_messages_favedStickers: {
+			auto &d = result.c_messages_favedStickers();
+			Stickers::SpecialSetReceived(Stickers::FavedSetId, lang(lng_faved_stickers), d.vstickers.v, d.vhash.v, d.vpacks.v);
+		} return;
+		default: Unexpected("Type in ApiWrap::favedStickersDone()");
+		}
+	};
+	_favedStickersUpdateRequest = request(MTPmessages_GetFavedStickers(MTP_int(Local::countFavedStickersHash()))).done(onDone).fail([this, onDone](const RPCError &error) {
+		LOG(("App Fail: Failed to get faved stickers!"));
+		onDone(MTP_messages_favedStickersNotModified());
+	}).send();
+}
+
+void ApiWrap::requestFeaturedStickers(TimeId now) {
+	if (Global::LastFeaturedStickersUpdate() != 0 && now < Global::LastFeaturedStickersUpdate() + kStickersUpdateTimeout) {
+		return;
+	}
+	if (_featuredStickersUpdateRequest) {
+		return;
+	}
+	auto onDone = [this](const MTPmessages_FeaturedStickers &result) {
+		Global::SetLastFeaturedStickersUpdate(getms(true));
+		_featuredStickersUpdateRequest = 0;
+
+		switch (result.type()) {
+		case mtpc_messages_featuredStickersNotModified: return;
+		case mtpc_messages_featuredStickers: {
+			auto &d = result.c_messages_featuredStickers();
+			Stickers::FeaturedSetsReceived(d.vsets.v, d.vunread.v, d.vhash.v);
+		} return;
+		default: Unexpected("Type in ApiWrap::featuredStickersDone()");
+		}
+	};
+	_featuredStickersUpdateRequest = request(MTPmessages_GetFeaturedStickers(MTP_int(Local::countFeaturedStickersHash()))).done(onDone).fail([this, onDone](const RPCError &error) {
+		LOG(("App Fail: Failed to get featured stickers!"));
+		onDone(MTP_messages_featuredStickersNotModified());
+	}).send();
+}
+
+void ApiWrap::requestSavedGifs(TimeId now) {
+	if (cLastSavedGifsUpdate() != 0 && now < cLastSavedGifsUpdate() + kStickersUpdateTimeout) {
+		return;
+	}
+	if (_savedGifsUpdateRequest) {
+		return;
+	}
+	auto onDone = [this](const MTPmessages_SavedGifs &result) {
+		cSetLastSavedGifsUpdate(getms(true));
+		_savedGifsUpdateRequest = 0;
+
+		switch (result.type()) {
+		case mtpc_messages_savedGifsNotModified: return;
+		case mtpc_messages_savedGifs: {
+			auto &d = result.c_messages_savedGifs();
+			Stickers::GifsReceived(d.vgifs.v, d.vhash.v);
+		} return;
+		default: Unexpected("Type in ApiWrap::savedGifsDone()");
+		}
+	};
+	_savedGifsUpdateRequest = request(MTPmessages_GetSavedGifs(MTP_int(Local::countSavedGifsHash()))).done(onDone).fail([this, onDone](const RPCError &error) {
+		LOG(("App Fail: Failed to get saved gifs!"));
+		onDone(MTP_messages_savedGifsNotModified());
+	}).send();
 }
 
 void ApiWrap::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
@@ -1538,7 +1604,7 @@ void ApiWrap::applyUpdatesNoPtsCheck(const MTPUpdates &updates) {
 	case mtpc_updateShortMessage: {
 		auto &d = updates.c_updateShortMessage();
 		auto flags = mtpCastFlags(d.vflags.v) | MTPDmessage::Flag::f_from_id;
-		App::histories().addNewMessage(MTP_message(MTP_flags(flags), d.vid, d.is_out() ? MTP_int(AuthSession::CurrentUserId()) : d.vuser_id, MTP_peerUser(d.is_out() ? d.vuser_id : MTP_int(AuthSession::CurrentUserId())), d.vfwd_from, d.vvia_bot_id, d.vreply_to_msg_id, d.vdate, d.vmessage, MTP_messageMediaEmpty(), MTPnullMarkup, d.has_entities() ? d.ventities : MTPnullEntities, MTPint(), MTPint(), MTPstring()), NewMessageUnread);
+		App::histories().addNewMessage(MTP_message(MTP_flags(flags), d.vid, d.is_out() ? MTP_int(Auth().userId()) : d.vuser_id, MTP_peerUser(d.is_out() ? d.vuser_id : MTP_int(Auth().userId())), d.vfwd_from, d.vvia_bot_id, d.vreply_to_msg_id, d.vdate, d.vmessage, MTP_messageMediaEmpty(), MTPnullMarkup, d.has_entities() ? d.ventities : MTPnullEntities, MTPint(), MTPint(), MTPstring()), NewMessageUnread);
 	} break;
 
 	case mtpc_updateShortChatMessage: {
@@ -1574,9 +1640,9 @@ void ApiWrap::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 
 	case mtpc_updateReadMessagesContents: {
 		auto &d = update.c_updateReadMessagesContents();
-		auto &v = d.vmessages.v;
-		for (auto i = 0, l = v.size(); i < l; ++i) {
-			if (auto item = App::histItemById(NoChannel, v.at(i).v)) {
+		auto possiblyReadMentions = base::flat_set<MsgId>();
+		for_const (auto &msgId, d.vmessages.v) {
+			if (auto item = App::histItemById(NoChannel, msgId.v)) {
 				if (item->isMediaUnread()) {
 					item->markMediaRead();
 					Ui::repaintHistoryItem(item);
@@ -1586,8 +1652,12 @@ void ApiWrap::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 						item->history()->peer->asUser()->madeAction(when);
 					}
 				}
+			} else {
+				// Perhaps it was an unread mention!
+				possiblyReadMentions.insert(msgId.v);
 			}
 		}
+		checkForUnreadMentions(possiblyReadMentions);
 	} break;
 
 	case mtpc_updateReadHistoryInbox: {
@@ -1650,7 +1720,7 @@ void ApiWrap::applyUpdateNoPtsCheck(const MTPUpdate &update) {
 	}
 }
 
-void ApiWrap::jumpToDate(gsl::not_null<PeerData*> peer, const QDate &date) {
+void ApiWrap::jumpToDate(not_null<PeerData*> peer, const QDate &date) {
 	// API returns a message with date <= offset_date.
 	// So we request a message with offset_date = desired_date - 1 and add_offset = -1.
 	// This should give us the first message with date >= desired_date.
@@ -1690,6 +1760,150 @@ void ApiWrap::jumpToDate(gsl::not_null<PeerData*> peer, const QDate &date) {
 		}
 		Ui::showPeerHistory(peer, ShowAtUnreadMsgId);
 	}).send();
+}
+
+void ApiWrap::preloadEnoughUnreadMentions(not_null<History*> history) {
+	auto fullCount = history->getUnreadMentionsCount();
+	auto loadedCount = history->getUnreadMentionsLoadedCount();
+	auto allLoaded = (fullCount >= 0) ? (loadedCount >= fullCount) : false;
+	if (fullCount < 0 || loadedCount >= kUnreadMentionsPreloadIfLess || allLoaded) {
+		return;
+	}
+	if (_unreadMentionsRequests.contains(history)) {
+		return;
+	}
+	auto offsetId = loadedCount ? history->getMaxLoadedUnreadMention() : 1;
+	auto limit = loadedCount ? kUnreadMentionsNextRequestLimit : kUnreadMentionsFirstRequestLimit;
+	auto addOffset = loadedCount ? -(limit + 1) : -limit;
+	auto maxId = 0;
+	auto minId = 0;
+	auto requestId = request(MTPmessages_GetUnreadMentions(history->peer->input, MTP_int(offsetId), MTP_int(addOffset), MTP_int(limit), MTP_int(maxId), MTP_int(minId))).done([this, history](const MTPmessages_Messages &result) {
+		_unreadMentionsRequests.remove(history);
+		history->addUnreadMentionsSlice(result);
+	}).fail([this, history](const RPCError &error) {
+		_unreadMentionsRequests.remove(history);
+	}).send();
+	_unreadMentionsRequests.emplace(history, requestId);
+}
+
+void ApiWrap::checkForUnreadMentions(const base::flat_set<MsgId> &possiblyReadMentions, ChannelData *channel) {
+	for (auto msgId : possiblyReadMentions) {
+		requestMessageData(channel, msgId, [](ChannelData *channel, MsgId msgId) {
+			if (auto item = App::histItemById(channel, msgId)) {
+				if (item->mentionsMe()) {
+					item->markMediaRead();
+				}
+			}
+		});
+	}
+}
+
+void ApiWrap::cancelEditChatAdmins(not_null<ChatData*> chat) {
+	_chatAdminsEnabledRequests.take(chat)
+		| requestCanceller();
+
+	_chatAdminsSaveRequests.take(chat)
+		| base::for_each_apply(requestCanceller());
+
+	_chatAdminsToSave.remove(chat);
+}
+
+void ApiWrap::editChatAdmins(
+		not_null<ChatData*> chat,
+		bool adminsEnabled,
+		base::flat_set<not_null<UserData*>> &&admins) {
+	cancelEditChatAdmins(chat);
+	if (adminsEnabled) {
+		_chatAdminsToSave.emplace(chat, std::move(admins));
+	}
+
+	auto requestId = request(MTPmessages_ToggleChatAdmins(chat->inputChat, MTP_bool(adminsEnabled))).done([this, chat](const MTPUpdates &updates) {
+		_chatAdminsEnabledRequests.remove(chat);
+		applyUpdates(updates);
+		saveChatAdmins(chat);
+	}).fail([this, chat](const RPCError &error) {
+		_chatAdminsEnabledRequests.remove(chat);
+		if (error.type() == qstr("CHAT_NOT_MODIFIED")) {
+			saveChatAdmins(chat);
+		}
+	}).send();
+	_chatAdminsEnabledRequests.emplace(chat, requestId);
+}
+
+void ApiWrap::saveChatAdmins(not_null<ChatData*> chat) {
+	if (!_chatAdminsToSave.contains(chat)) {
+		return;
+	}
+	auto requestId = request(MTPmessages_GetFullChat(chat->inputChat)).done([this, chat](const MTPmessages_ChatFull &result) {
+		_chatAdminsEnabledRequests.remove(chat);
+		processFullPeer(chat, result);
+		sendSaveChatAdminsRequests(chat);
+	}).fail([this, chat](const RPCError &error) {
+		_chatAdminsEnabledRequests.remove(chat);
+		_chatAdminsToSave.remove(chat);
+	}).send();
+	_chatAdminsEnabledRequests.emplace(chat, requestId);
+}
+
+void ApiWrap::sendSaveChatAdminsRequests(not_null<ChatData*> chat) {
+	auto editOne = [this, chat](not_null<UserData*> user, bool admin) {
+		auto requestId = request(MTPmessages_EditChatAdmin(
+				chat->inputChat,
+				user->inputUser,
+				MTP_bool(admin)))
+			.done([this, chat, user, admin](
+					const MTPBool &result,
+					mtpRequestId requestId) {
+			_chatAdminsSaveRequests[chat].remove(requestId);
+			if (_chatAdminsSaveRequests[chat].empty()) {
+				_chatAdminsSaveRequests.remove(chat);
+				Notify::peerUpdatedDelayed(chat, Notify::PeerUpdate::Flag::AdminsChanged);
+			}
+			if (mtpIsTrue(result)) {
+				if (admin) {
+					if (chat->noParticipantInfo()) {
+						requestFullPeer(chat);
+					} else {
+						chat->admins.insert(user);
+					}
+				} else {
+					chat->admins.remove(user);
+				}
+			}
+		}).fail([this, chat](
+				const RPCError &error,
+				mtpRequestId requestId) {
+			_chatAdminsSaveRequests[chat].remove(requestId);
+			if (_chatAdminsSaveRequests[chat].empty()) {
+				_chatAdminsSaveRequests.remove(chat);
+			}
+			chat->invalidateParticipants();
+			if (error.type() == qstr("USER_RESTRICTED")) {
+				Ui::show(Box<InformBox>(lang(lng_cant_do_this)));
+			}
+		}).canWait(5).send();
+
+		_chatAdminsSaveRequests[chat].insert(requestId);
+	};
+	auto appointOne = [&](auto user) { editOne(user, true); };
+	auto removeOne = [&](auto user) { editOne(user, false); };
+
+	auto admins = _chatAdminsToSave.take(chat);
+	Assert(!!admins);
+
+	auto toRemove = chat->admins;
+	auto toAppoint = std::vector<not_null<UserData*>>();
+	if (!admins->empty()) {
+		toAppoint.reserve(admins->size());
+		for (auto user : *admins) {
+			if (!toRemove.remove(user) && user->id != peerFromUser(chat->creator)) {
+				toAppoint.push_back(user);
+			}
+		}
+	}
+	base::for_each(toRemove, removeOne);
+	base::for_each(toAppoint, appointOne);
+	requestSendDelayed();
 }
 
 ApiWrap::~ApiWrap() = default;

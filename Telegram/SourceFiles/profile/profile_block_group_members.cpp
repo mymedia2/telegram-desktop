@@ -67,7 +67,7 @@ GroupMembersWidget::GroupMembersWidget(QWidget *parent, PeerData *peer, TitleVis
 	refreshMembers();
 }
 
-void GroupMembersWidget::editAdmin(gsl::not_null<UserData*> user) {
+void GroupMembersWidget::editAdmin(not_null<UserData*> user) {
 	auto megagroup = peer()->asMegagroup();
 	if (!megagroup) {
 		return; // not supported
@@ -87,7 +87,7 @@ void GroupMembersWidget::editAdmin(gsl::not_null<UserData*> user) {
 	Ui::show(std::move(box));
 }
 
-void GroupMembersWidget::restrictUser(gsl::not_null<UserData*> user) {
+void GroupMembersWidget::restrictUser(not_null<UserData*> user) {
 	auto megagroup = peer()->asMegagroup();
 	if (!megagroup) {
 		return; // not supported
@@ -108,7 +108,7 @@ void GroupMembersWidget::restrictUser(gsl::not_null<UserData*> user) {
 
 void GroupMembersWidget::removePeer(PeerData *selectedPeer) {
 	auto user = selectedPeer->asUser();
-	t_assert(user != nullptr);
+	Assert(user != nullptr);
 	auto text = lng_profile_sure_kick(lt_user, user->firstName);
 	auto currentRestrictedRights = MTP_channelBannedRights(MTP_flags(0), MTP_int(0));
 	if (auto channel = peer()->asMegagroup()) {
@@ -122,7 +122,7 @@ void GroupMembersWidget::removePeer(PeerData *selectedPeer) {
 		if (auto chat = peer->asChat()) {
 			if (App::main()) App::main()->kickParticipant(chat, user);
 		} else if (auto channel = peer->asChannel()) {
-			if (App::api()) App::api()->kickParticipant(channel, user, currentRestrictedRights);
+			Auth().api().kickParticipant(channel, user, currentRestrictedRights);
 		}
 	}));
 }
@@ -174,7 +174,7 @@ void GroupMembersWidget::preloadMore() {
 	if (auto megagroup = peer()->asMegagroup()) {
 		auto &megagroupInfo = megagroup->mgInfo;
 		if (!megagroupInfo->lastParticipants.isEmpty() && megagroupInfo->lastParticipants.size() < megagroup->membersCount()) {
-			App::api()->requestLastParticipants(megagroup, false);
+			Auth().api().requestLastParticipants(megagroup, false);
 		}
 	}
 }
@@ -290,14 +290,14 @@ void GroupMembersWidget::refreshMembers() {
 	if (auto chat = peer()->asChat()) {
 		checkSelfAdmin(chat);
 		if (chat->noParticipantInfo()) {
-			App::api()->requestFullPeer(chat);
+			Auth().api().requestFullPeer(chat);
 		}
 		fillChatMembers(chat);
 		refreshLimitReached();
 	} else if (auto megagroup = peer()->asMegagroup()) {
 		auto &megagroupInfo = megagroup->mgInfo;
 		if (megagroupInfo->lastParticipants.isEmpty() || megagroup->lastParticipantsCountOutdated()) {
-			App::api()->requestLastParticipants(megagroup);
+			Auth().api().requestLastParticipants(megagroup);
 		}
 		fillMegagroupMembers(megagroup);
 	}
@@ -407,7 +407,7 @@ void GroupMembersWidget::setItemFlags(Item *item, ChatData *chat) {
 	auto isAdmin = chat->admins.contains(user);
 	auto adminState = isCreator ? AdminState::Creator : isAdmin ? AdminState::Admin : AdminState::None;
 	item->adminState = adminState;
-	if (item->peer->id == AuthSession::CurrentUserPeerId()) {
+	if (item->peer->id == Auth().userPeerId()) {
 		item->hasRemoveLink = false;
 	} else if (chat->amCreator() || (chat->amAdmin() && (adminState == AdminState::None))) {
 		item->hasRemoveLink = true;
@@ -426,7 +426,7 @@ GroupMembersWidget::Member *GroupMembersWidget::addUser(ChannelData *megagroup, 
 }
 
 void GroupMembersWidget::fillMegagroupMembers(ChannelData *megagroup) {
-	t_assert(megagroup->mgInfo != nullptr);
+	Assert(megagroup->mgInfo != nullptr);
 	if (megagroup->mgInfo->lastParticipants.isEmpty()) return;
 
 	if (!megagroup->canViewMembers()) {
@@ -486,7 +486,7 @@ void GroupMembersWidget::setItemFlags(Item *item, ChannelData *megagroup) {
 	if (item->adminState != adminState) {
 		item->adminState = adminState;
 		auto user = item->peer->asUser();
-		t_assert(user != nullptr);
+		Assert(user != nullptr);
 		if (user->botInfo) {
 			// Update "has access to messages" status.
 			item->statusText = QString();

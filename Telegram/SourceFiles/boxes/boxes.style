@@ -666,3 +666,29 @@ rightsHeaderLabel: FlatLabel(boxLabel) {
 	textFg: windowActiveTextFg;
 }
 rightsUntilMargin: margins(0px, 8px, 0px, 0px);
+
+mutePhotoButton: PeerAvatarButton {
+	size: 40px;
+	photoSize: 40px;
+}
+muteChatTitle: FlatLabel(boxLabel) {
+	width: 235px;
+	maxHeight: 20px;  // block word wrap
+	margin: margins(50px, 0px, 0px, 0px);  // left offset for place peer avatar
+	style: TextStyle(boxTextStyle) {
+		font: font(boxFontSize semibold);
+	}
+}
+
+groupStickersRemove: contactsSearchCancel;
+groupStickersRemovePosition: point(6px, 6px);
+groupStickersFieldPadding: margins(8px, 6px, 8px, 6px);
+groupStickersField: InputField(contactsSearchField) {
+	placeholderFont: boxTextFont;
+	font: boxTextFont;
+	placeholderMargins: margins(0px, 0px, 0px, 0px);
+	textMargins: margins(0px, 7px, 0px, 0px);
+	textBg: boxBg;
+	heightMin: 32px;
+}
+groupStickersSubTitleHeight: 36px;

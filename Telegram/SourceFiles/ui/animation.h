@@ -417,6 +417,9 @@ QPainterPath path(QPointF (&from)[N]) {
 	return result;
 }
 
+bool Disabled();
+void SetDisabled(bool disabled);
+
 };
 
 class BasicAnimation;
@@ -613,7 +616,7 @@ public:
 	}
 
 	float64 current() const {
-		t_assert(_data != nullptr);
+		Assert(_data != nullptr);
 		return _data->value.current();
 	}
 	float64 current(float64 def) const {
@@ -668,7 +671,7 @@ private:
 			, updateCallback(std::move(updateCallback)) {
 		}
 		void step(float64 ms, bool timer) {
-			auto dt = (ms >= duration) ? 1. : (ms / duration);
+			auto dt = (ms >= duration || anim::Disabled()) ? 1. : (ms / duration);
 			if (dt >= 1) {
 				value.finish();
 				a_animation.stop();

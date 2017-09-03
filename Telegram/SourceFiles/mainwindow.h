@@ -93,6 +93,7 @@ public:
 	PasscodeWidget *passcodeWidget();
 
 	bool doWeReadServerHistory();
+	bool doWeReadMentions();
 
 	void activate();
 
@@ -115,8 +116,6 @@ public:
 
 	void sendPaths();
 
-	void changingMsgId(HistoryItem *row, MsgId newId) override;
-
 	QImage iconWithCounter(int size, int count, style::color bg, style::color fg, bool smallIcon) override;
 
 	bool contentOverlapped(const QRect &globalRect);
@@ -138,7 +137,6 @@ public:
 	void ui_showMediaPreview(DocumentData *document);
 	void ui_showMediaPreview(PhotoData *photo);
 	void ui_hideMediaPreview();
-	PeerData *ui_getPeerForMouseAction() override;
 
 protected:
 	bool eventFilter(QObject *o, QEvent *e) override;

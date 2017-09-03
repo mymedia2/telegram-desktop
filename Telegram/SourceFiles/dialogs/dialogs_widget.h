@@ -59,7 +59,7 @@ class DialogsWidget : public Window::AbstractSectionWidget, public RPCSender {
 	Q_OBJECT
 
 public:
-	DialogsWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller);
+	DialogsWidget(QWidget *parent, not_null<Window::Controller*> controller);
 
 	void updateDragInScroll(bool inScroll);
 
@@ -198,6 +198,7 @@ private:
 	PeerData *_searchInPeer = nullptr;
 	PeerData *_searchInMigrated = nullptr;
 	UserData *_searchFromUser = nullptr;
+	QString _lastFilterText;
 
 	QTimer _searchTimer;
 

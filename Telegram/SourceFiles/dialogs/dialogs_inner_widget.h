@@ -21,6 +21,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #pragma once
 
 #include "dialogs/dialogs_widget.h"
+#include "base/flags.h"
 
 namespace Dialogs {
 class Row;
@@ -42,7 +43,7 @@ class DialogsInner : public Ui::SplittedWidget, public RPCSender, private base::
 	Q_OBJECT
 
 public:
-	DialogsInner(QWidget *parent, gsl::not_null<Window::Controller*> controller, QWidget *main);
+	DialogsInner(QWidget *parent, not_null<Window::Controller*> controller, QWidget *main);
 
 	void dialogsReceived(const QVector<MTPDialog> &dialogs);
 	void addSavedPeersAfter(const QDateTime &date);
@@ -115,10 +116,8 @@ public:
 
 	~DialogsInner();
 
-	public slots:
+public slots:
 	void onParentGeometryChanged();
-	void onPeerNameChanged(PeerData *peer, const PeerData::Names &oldNames, const PeerData::NameFirstChars &oldChars);
-	void onPeerPhotoChanged(PeerData *peer);
 	void onDialogRowReplaced(Dialogs::Row *oldRow, Dialogs::Row *newRow);
 
 	void onMenuDestroyed(QObject*);
@@ -172,6 +171,7 @@ private:
 	bool isSelected() const {
 		return _importantSwitchSelected || _selected || (_hashtagSelected >= 0) || (_filteredSelected >= 0) || (_peerSearchSelected >= 0) || (_searchedSelected >= 0);
 	}
+	void handlePeerNameChange(not_null<PeerData*> peer, const PeerData::Names &oldNames, const PeerData::NameFirstChars &oldChars);
 
 	void itemRemoved(HistoryItem *item);
 	enum class UpdateRowSection {
@@ -181,8 +181,9 @@ private:
 		MessageSearch = 0x08,
 		All = 0x0F,
 	};
-	Q_DECLARE_FLAGS(UpdateRowSections, UpdateRowSection);
-	Q_DECLARE_FRIEND_OPERATORS_FOR_FLAGS(UpdateRowSections);
+	using UpdateRowSections = base::flags<UpdateRowSection>;
+	friend inline constexpr auto is_flag_type(UpdateRowSection) { return true; };
+
 	void updateDialogRow(PeerData *peer, MsgId msgId, QRect updateRect, UpdateRowSections sections = UpdateRowSection::All);
 
 	int dialogsOffset() const;
@@ -194,12 +195,11 @@ private:
 	void paintDialog(Painter &p, Dialogs::Row *row, int fullWidth, PeerData *active, PeerData *selected, bool onlyBackground, TimeMs ms);
 	void paintPeerSearchResult(Painter &p, const PeerSearchResult *result, int fullWidth, bool active, bool selected, bool onlyBackground, TimeMs ms) const;
 	void paintSearchInPeer(Painter &p, int fullWidth, bool onlyBackground, TimeMs ms) const;
+	void paintSearchInFilter(Painter &p, not_null<PeerData*> peer, int top, int fullWidth, const Text &text) const;
 
 	void clearSelection();
 	void clearSearchResults(bool clearPeerSearchResults = true);
 	void updateSelectedRow(PeerData *peer = 0);
-	void updateSearchFromBubble();
-	void handleSearchFromUserClick();
 
 	Dialogs::IndexedList *shownDialogs() const {
 		return (Global::DialogsMode() == Dialogs::Mode::Important) ? _dialogsImportant.get() : _dialogs.get();
@@ -215,7 +215,7 @@ private:
 	void savePinnedOrder();
 	void step_pinnedShifting(TimeMs ms, bool timer);
 
-	gsl::not_null<Window::Controller*> _controller;
+	not_null<Window::Controller*> _controller;
 
 	DialogsList _dialogs;
 	DialogsList _dialogsImportant;
@@ -224,6 +224,7 @@ private:
 	DialogsList _contacts;
 
 	bool _mouseSelection = false;
+	QPoint _mouseLastGlobalPosition;
 	Qt::MouseButton _pressButton = Qt::LeftButton;
 
 	std::unique_ptr<ImportantSwitch> _importantSwitch;
@@ -281,12 +282,12 @@ private:
 
 	object_ptr<Ui::LinkButton> _addContactLnk;
 	object_ptr<Ui::IconButton> _cancelSearchInPeer;
+	object_ptr<Ui::IconButton> _cancelSearchFromUser;
 
 	PeerData *_searchInPeer = nullptr;
 	PeerData *_searchInMigrated = nullptr;
 	UserData *_searchFromUser = nullptr;
-	class SearchFromBubble; // Just a wrap for Ui::MultiSelect::Item.
-	std::unique_ptr<SearchFromBubble> _searchFromUserBubble;
+	Text _searchFromUserText;
 	PeerData *_menuPeer = nullptr;
 
 	Ui::PopupMenu *_menu = nullptr;
@@ -294,5 +295,3 @@ private:
 	base::lambda<void()> _loadMoreCallback;
 
 };
-
-Q_DECLARE_OPERATORS_FOR_FLAGS(DialogsInner::UpdateRowSections);

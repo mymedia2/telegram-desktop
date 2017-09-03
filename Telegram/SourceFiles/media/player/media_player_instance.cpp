@@ -69,7 +69,7 @@ Instance::Instance()
 	// While we have one Media::Player::Instance for all authsessions we have to do this.
 	auto handleAuthSessionChange = [this] {
 		if (AuthSession::Exists()) {
-			subscribe(AuthSession::Current().calls().currentCallChanged(), [this](Calls::Call *call) {
+			subscribe(Auth().calls().currentCallChanged(), [this](Calls::Call *call) {
 				if (call) {
 					pause(AudioMsgId::Type::Voice);
 					pause(AudioMsgId::Type::Song);
@@ -131,8 +131,8 @@ void Instance::setCurrent(const AudioMsgId &audioId) {
 			auto migrated = data->migrated;
 			auto item = data->current ? App::histItemById(data->current.contextId()) : nullptr;
 			if (item) {
-				data->history = item->history()->peer->migrateTo() ? App::history(item->history()->peer->migrateTo()) : item->history();
-				data->migrated = data->history->peer->migrateFrom() ? App::history(data->history->peer->migrateFrom()) : nullptr;
+				data->history = item->history()->migrateToOrMe();
+				data->migrated = data->history->migrateFrom();
 			} else {
 				data->history = nullptr;
 				data->migrated = nullptr;
@@ -150,9 +150,9 @@ void Instance::rebuildPlaylist(Data *data) {
 
 	data->playlist.clear();
 	if (data->history && data->history->loadedAtBottom()) {
-		auto &historyOverview = data->history->overview[data->overview];
+		auto &historyOverview = data->history->overview(data->overview);
 		if (data->migrated && data->migrated->loadedAtBottom() && data->history->loadedAtTop()) {
-			auto &migratedOverview = data->migrated->overview[data->overview];
+			auto &migratedOverview = data->migrated->overview(data->overview);
 			data->playlist.reserve(migratedOverview.size() + historyOverview.size());
 			for_const (auto msgId, migratedOverview) {
 				data->playlist.push_back(FullMsgId(data->migrated->channelId(), msgId));

@@ -215,7 +215,7 @@ void BoxController::loadMoreRows() {
 		return;
 	}
 
-	_loadRequestId = request(MTPmessages_Search(MTP_flags(0), MTP_inputPeerEmpty(), MTP_string(QString()), MTP_inputUserEmpty(), MTP_inputMessagesFilterPhoneCalls(MTP_flags(0)), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(_offsetId), MTP_int(_offsetId ? kFirstPageCount : kPerPageCount))).done([this](const MTPmessages_Messages &result) {
+	_loadRequestId = request(MTPmessages_Search(MTP_flags(0), MTP_inputPeerEmpty(), MTP_string(QString()), MTP_inputUserEmpty(), MTP_inputMessagesFilterPhoneCalls(MTP_flags(0)), MTP_int(0), MTP_int(0), MTP_int(_offsetId), MTP_int(0), MTP_int(_offsetId ? kFirstPageCount : kPerPageCount), MTP_int(0), MTP_int(0))).done([this](const MTPmessages_Messages &result) {
 		_loadRequestId = 0;
 
 		auto handleResult = [this](auto &data) {
@@ -243,15 +243,15 @@ void BoxController::refreshAbout() {
 	setDescriptionText(delegate()->peerListFullRowsCount() ? QString() : lang(lng_call_box_about));
 }
 
-void BoxController::rowClicked(gsl::not_null<PeerListRow*> row) {
+void BoxController::rowClicked(not_null<PeerListRow*> row) {
 	auto itemsRow = static_cast<Row*>(row.get());
 	auto itemId = itemsRow->maxItemId();
 	Ui::showPeerHistoryAsync(row->peer()->id, itemId);
 }
 
-void BoxController::rowActionClicked(gsl::not_null<PeerListRow*> row) {
+void BoxController::rowActionClicked(not_null<PeerListRow*> row) {
 	auto user = row->peer()->asUser();
-	t_assert(user != nullptr);
+	Assert(user != nullptr);
 
 	Current().startOutgoingCall(user);
 }
@@ -323,7 +323,7 @@ BoxController::Row *BoxController::rowForItem(HistoryItem *item) {
 		// In that case we sometimes need to return rowAt(left + 1), not rowAt(left).
 		if (result->minItemId() > itemId && left + 1 < fullRowsCount) {
 			auto possibleResult = static_cast<Row*>(v->peerListRowAt(left + 1).get());
-			t_assert(possibleResult->maxItemId() < itemId);
+			Assert(possibleResult->maxItemId() < itemId);
 			if (possibleResult->canAddItem(item)) {
 				return possibleResult;
 			}

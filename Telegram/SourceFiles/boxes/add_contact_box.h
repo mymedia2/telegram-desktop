@@ -24,6 +24,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "mtproto/sender.h"
 
 class ConfirmBox;
+class PeerListBox;
 
 namespace Ui {
 class FlatLabel;
@@ -39,6 +40,13 @@ class Radioenum;
 class LinkButton;
 class NewAvatarButton;
 } // namespace Ui
+
+enum class PeerFloodType {
+	Send,
+	InviteGroup,
+	InviteChannel,
+};
+QString PeerFloodErrorText(PeerFloodType type);
 
 class AddContactBox : public BoxContent, public RPCSender {
 	Q_OBJECT
@@ -83,7 +91,7 @@ private:
 
 };
 
-class GroupInfoBox : public BoxContent, public RPCSender {
+class GroupInfoBox : public BoxContent, private MTP::Sender {
 	Q_OBJECT
 
 public:
@@ -107,10 +115,8 @@ private slots:
 
 private:
 	void setupPhotoButton();
-
-	void creationDone(const MTPUpdates &updates);
-	bool creationFail(const RPCError &e);
-	void exportDone(const MTPExportedChatInvite &result);
+	void createChannel(const QString &title, const QString &description);
+	void createGroup(not_null<PeerListBox*> selectUsersBox, const QString &title, const std::vector<not_null<PeerData*>> &users);
 
 	void updateMaxHeight();
 	void updateSelected(const QPoint &cursorGlobalPosition);
@@ -124,7 +130,7 @@ private:
 
 	QImage _photoImage;
 
-	// channel creation
+	// group / channel creation
 	mtpRequestId _creationRequestId = 0;
 	ChannelData *_createdChannel = nullptr;
 
@@ -137,7 +143,6 @@ public:
 	SetupChannelBox(QWidget*, ChannelData *channel, bool existing = false);
 
 	void setInnerFocus() override;
-	void closeHook() override;
 
 protected:
 	void prepare() override;
@@ -161,6 +166,7 @@ private:
 	};
 	void privacyChanged(Privacy value);
 	void updateSelected(const QPoint &cursorGlobalPosition);
+	void showAddContactsToChannelBox() const;
 
 	void onUpdateDone(const MTPBool &result);
 	bool onUpdateFail(const RPCError &error);
@@ -200,7 +206,7 @@ class EditNameTitleBox : public BoxContent, public RPCSender {
 	Q_OBJECT
 
 public:
-	EditNameTitleBox(QWidget*, gsl::not_null<PeerData*> peer);
+	EditNameTitleBox(QWidget*, not_null<PeerData*> peer);
 
 protected:
 	void setInnerFocus() override;
@@ -219,7 +225,7 @@ private:
 	void onSaveChatDone(const MTPUpdates &updates);
 	bool onSaveChatFail(const RPCError &e);
 
-	gsl::not_null<PeerData*> _peer;
+	not_null<PeerData*> _peer;
 
 	object_ptr<Ui::InputField> _first;
 	object_ptr<Ui::InputField> _last;
@@ -233,7 +239,7 @@ private:
 
 class EditBioBox : public BoxContent, private MTP::Sender {
 public:
-	EditBioBox(QWidget*, gsl::not_null<UserData*> self);
+	EditBioBox(QWidget*, not_null<UserData*> self);
 
 protected:
 	void setInnerFocus() override;
@@ -247,7 +253,7 @@ private:
 	void save();
 
 	style::InputField _dynamicFieldStyle;
-	gsl::not_null<UserData*> _self;
+	not_null<UserData*> _self;
 
 	object_ptr<Ui::InputArea> _bio;
 	object_ptr<Ui::FlatLabel> _countdown;
@@ -261,7 +267,7 @@ class EditChannelBox : public BoxContent, public RPCSender {
 	Q_OBJECT
 
 public:
-	EditChannelBox(QWidget*, gsl::not_null<ChannelData*> channel);
+	EditChannelBox(QWidget*, not_null<ChannelData*> channel);
 
 protected:
 	void prepare() override;
@@ -272,8 +278,6 @@ protected:
 	void paintEvent(QPaintEvent *e) override;
 
 private slots:
-	void peerUpdated(PeerData *peer);
-
 	void onSave();
 	void onDescriptionResized();
 	void onPublicLink();
@@ -285,6 +289,7 @@ private:
 	void updateMaxHeight();
 	bool canEditSignatures() const;
 	bool canEditInvites() const;
+	void handleChannelNameChange();
 
 	void onSaveTitleDone(const MTPUpdates &result);
 	void onSaveDescriptionDone(const MTPBool &result);
@@ -296,7 +301,7 @@ private:
 	void saveSign();
 	void saveInvites();
 
-	gsl::not_null<ChannelData*> _channel;
+	not_null<ChannelData*> _channel;
 
 	object_ptr<Ui::InputField> _title;
 	object_ptr<Ui::InputArea> _description;

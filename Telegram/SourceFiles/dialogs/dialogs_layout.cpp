@@ -203,7 +203,7 @@ const style::icon *ChatTypeIcon(PeerData *peer, bool active, bool selected) {
 }
 
 void paintUnreadBadge(Painter &p, const QRect &rect, const UnreadBadgeStyle &st) {
-	t_assert(rect.height() == st.size);
+	Assert(rect.height() == st.size);
 
 	int index = (st.muted ? 0x03 : 0x00) + (st.active ? 0x02 : (st.selected ? 0x01 : 0x00));
 	int size = st.size, sizehalf = size / 2;
@@ -211,7 +211,7 @@ void paintUnreadBadge(Painter &p, const QRect &rect, const UnreadBadgeStyle &st)
 	unreadBadgeStyle.createIfNull();
 	auto badgeData = unreadBadgeStyle->sizes;
 	if (st.sizeId > 0) {
-		t_assert(st.sizeId < UnreadBadgeSizesCount);
+		Assert(st.sizeId < UnreadBadgeSizesCount);
 		badgeData = &unreadBadgeStyle->sizes[st.sizeId];
 	}
 	auto bg = unreadBadgeStyle->bg[index];
@@ -293,9 +293,20 @@ void RowPainter::paint(Painter &p, const Row *row, int fullWidth, bool active, b
 		cloudDraft = nullptr; // Draw item, if draft is older.
 	}
 	paintRow(p, row, history, item, cloudDraft, displayDate(), fullWidth, active, selected, onlyBackground, ms, [&p, fullWidth, active, selected, ms, history, unreadCount](int nameleft, int namewidth, HistoryItem *item) {
-		int availableWidth = namewidth;
-		int texttop = st::dialogsPadding.y() + st::msgNameFont->height + st::dialogsSkip;
-		if (unreadCount) {
+		auto availableWidth = namewidth;
+		auto texttop = st::dialogsPadding.y() + st::msgNameFont->height + st::dialogsSkip;
+		auto hadOneBadge = false;
+		auto displayUnreadCounter = (unreadCount != 0);
+		auto displayMentionBadge = history->hasUnreadMentions();
+		auto displayPinnedIcon = !displayUnreadCounter && history->isPinnedDialog();
+		if (displayMentionBadge
+			&& unreadCount == 1
+			&& item
+			&& item->isMediaUnread()
+			&& item->mentionsMe()) {
+			displayUnreadCounter = false;
+		}
+		if (displayUnreadCounter) {
 			auto counter = QString::number(unreadCount);
 			auto mutedCounter = history->mute();
 			auto unreadRight = fullWidth - st::dialogsPadding.x();
@@ -307,10 +318,28 @@ void RowPainter::paint(Painter &p, const Row *row, int fullWidth, bool active, b
 			st.muted = history->mute();
 			paintUnreadCount(p, counter, unreadRight, unreadTop, st, &unreadWidth);
 			availableWidth -= unreadWidth + st.padding;
-		} else if (history->isPinnedDialog()) {
+
+			hadOneBadge = true;
+		} else if (displayPinnedIcon) {
 			auto &icon = (active ? st::dialogsPinnedIconActive : (selected ? st::dialogsPinnedIconOver : st::dialogsPinnedIcon));
 			icon.paint(p, fullWidth - st::dialogsPadding.x() - icon.width(), texttop, fullWidth);
 			availableWidth -= icon.width() + st::dialogsUnreadPadding;
+
+			hadOneBadge = true;
+		}
+		if (displayMentionBadge) {
+			auto counter = qsl("@");
+			auto unreadRight = fullWidth - st::dialogsPadding.x() - (namewidth - availableWidth);
+			auto unreadTop = texttop + st::dialogsTextFont->ascent - st::dialogsUnreadFont->ascent - (st::dialogsUnreadHeight - st::dialogsUnreadFont->height) / 2;
+			auto unreadWidth = 0;
+
+			UnreadBadgeStyle st;
+			st.active = active;
+			st.muted = false;
+			st.padding = 0;
+			st.textTop = 0;
+			paintUnreadCount(p, counter, unreadRight, unreadTop, st, &unreadWidth);
+			availableWidth -= unreadWidth + st.padding + (hadOneBadge ? st::dialogsUnreadPadding : 0);
 		}
 		auto &color = active ? st::dialogsTextFgServiceActive : (selected ? st::dialogsTextFgServiceOver : st::dialogsTextFgService);
 		if (!history->paintSendAction(p, nameleft, texttop, availableWidth, fullWidth, color, ms)) {

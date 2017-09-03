@@ -39,7 +39,7 @@ class StickersListWidget : public TabbedSelector::Inner, private base::Subscribe
 	Q_OBJECT
 
 public:
-	StickersListWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller);
+	StickersListWidget(QWidget *parent, not_null<Window::Controller*> controller);
 
 	void refreshRecent() override;
 	void preloadImages() override;
@@ -47,9 +47,9 @@ public:
 	object_ptr<TabbedSelector::InnerFooter> createFooter() override;
 
 	void showStickerSet(uint64 setId);
+	void showMegagroupSet(ChannelData *megagroup);
 
 	void refreshStickers();
-	void refreshRecentStickers(bool resize = true);
 
 	void fillIcons(QList<StickerIcon> &icons);
 	bool preventAutoHide();
@@ -61,6 +61,8 @@ public:
 	void installedLocally(uint64 setId);
 	void notInstalledLocally(uint64 setId);
 	void clearInstalledLocally();
+
+	~StickersListWidget();
 
 protected:
 	void mousePressEvent(QMouseEvent *e) override;
@@ -105,6 +107,8 @@ private:
 	struct OverButton {
 		int section;
 	};
+	struct OverGroupAdd {
+	};
 	friend inline bool operator==(OverSticker a, OverSticker b) {
 		return (a.section == b.section) && (a.index == b.index) && (a.overDelete == b.overDelete);
 	}
@@ -114,7 +118,10 @@ private:
 	friend inline bool operator==(OverButton a, OverButton b) {
 		return (a.section == b.section);
 	}
-	using OverState = base::optional_variant<OverSticker, OverSet, OverButton>;
+	friend inline bool operator==(OverGroupAdd a, OverGroupAdd b) {
+		return true;
+	}
+	using OverState = base::optional_variant<OverSticker, OverSet, OverButton, OverGroupAdd>;
 
 	struct SectionInfo {
 		int section = 0;
@@ -124,14 +131,37 @@ private:
 		int rowsTop = 0;
 		int rowsBottom = 0;
 	};
+
+	struct Set {
+		Set(uint64 id, MTPDstickerSet::Flags flags, const QString &title, int32 hoversSize, const StickerPack &pack = StickerPack()) : id(id), flags(flags), title(title), pack(pack) {
+		}
+		uint64 id;
+		MTPDstickerSet::Flags flags;
+		QString title;
+		StickerPack pack;
+		QSharedPointer<Ui::RippleAnimation> ripple;
+	};
+	using Sets = QList<Set>;
+
 	template <typename Callback>
 	bool enumerateSections(Callback callback) const;
 	SectionInfo sectionInfo(int section) const;
 	SectionInfo sectionInfoByOffset(int yOffset) const;
 
-	void displaySet(quint64 setId);
-	void installSet(quint64 setId);
-	void removeSet(quint64 setId);
+	void displaySet(uint64 setId);
+	void installSet(uint64 setId);
+	void removeMegagroupSet(bool locally);
+	void removeSet(uint64 setId);
+
+	bool setHasTitle(const Set &set) const;
+	bool stickerHasDeleteButton(const Set &set, int index) const;
+	void refreshRecentStickers(bool resize = true);
+	void refreshFavedStickers();
+	enum class GroupStickersPlace {
+		Visible,
+		Hidden,
+	};
+	void refreshMegagroupStickers(GroupStickersPlace place);
 
 	void updateSelected();
 	void setSelected(OverState newSelected);
@@ -146,16 +176,6 @@ private:
 	};
 	void validateSelectedIcon(ValidateIconAnimations animations);
 
-	struct Set {
-		Set(uint64 id, MTPDstickerSet::Flags flags, const QString &title, int32 hoversSize, const StickerPack &pack = StickerPack()) : id(id), flags(flags), title(title), pack(pack) {
-		}
-		uint64 id;
-		MTPDstickerSet::Flags flags;
-		QString title;
-		StickerPack pack;
-		QSharedPointer<Ui::RippleAnimation> ripple;
-	};
-	using Sets = QList<Set>;
 	Sets &shownSets() {
 		return (_section == Section::Featured) ? _featuredSets : _mySets;
 	}
@@ -167,6 +187,7 @@ private:
 
 	void paintFeaturedStickers(Painter &p, QRect clip);
 	void paintStickers(Painter &p, QRect clip);
+	void paintMegagroupEmptySet(Painter &p, int y, bool buttonSelected, TimeMs ms);
 	void paintSticker(Painter &p, Set &set, int y, int index, bool selected, bool deleteSelected);
 
 	int stickersRight() const;
@@ -174,23 +195,30 @@ private:
 	QRect featuredAddRect(int index) const;
 	bool hasRemoveButton(int index) const;
 	QRect removeButtonRect(int index) const;
+	int megagroupSetInfoLeft() const;
+	void refreshMegagroupSetGeometry();
+	QRect megagroupSetButtonRectFinal() const;
 
 	enum class AppendSkip {
+		None,
 		Archived,
 		Installed,
 	};
-	void appendSet(Sets &to, uint64 setId, AppendSkip skip);
+	void appendSet(Sets &to, uint64 setId, AppendSkip skip = AppendSkip::None);
 
 	void selectEmoji(EmojiPtr emoji);
 	int stickersLeft() const;
 	QRect stickerRect(int section, int sel);
 
 	void removeRecentSticker(int section, int index);
+	void removeFavedSticker(int section, int index);
 
+	ChannelData *_megagroupSet = nullptr;
 	Sets _mySets;
 	Sets _featuredSets;
 	OrderedSet<uint64> _installedLocallySets;
 	QList<bool> _custom;
+	base::flat_set<not_null<DocumentData*>> _favedStickersMap;
 
 	Section _section = Section::Stickers;
 
@@ -199,9 +227,15 @@ private:
 
 	Footer *_footer = nullptr;
 
-	OverState _selected = nullptr;
-	OverState _pressed = nullptr;
+	OverState _selected;
+	OverState _pressed;
 	QPoint _lastMousePosition;
+
+	Text _megagroupSetAbout;
+	QString _megagroupSetButtonText;
+	int _megagroupSetButtonTextWidth = 0;
+	QRect _megagroupSetButtonRect;
+	std::unique_ptr<Ui::RippleAnimation> _megagroupSetButtonRipple;
 
 	QString _addText;
 	int _addWidth;

@@ -28,10 +28,12 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "ui/widgets/popup_menu.h"
 #include "window/window_controller.h"
 #include "chat_helpers/message_field.h"
+#include "chat_helpers/stickers.h"
 #include "history/history_widget.h"
 #include "mainwindow.h"
 #include "mainwidget.h"
 #include "auth_session.h"
+#include "messenger.h"
 #include "apiwrap.h"
 #include "lang/lang_keys.h"
 
@@ -82,10 +84,10 @@ int BinarySearchBlocksOrItems(const T &list, int edge) {
 
 // flick scroll taken from http://qt-project.org/doc/qt-4.8/demos-embedded-anomaly-src-flickcharm-cpp.html
 
-HistoryInner::HistoryInner(HistoryWidget *historyWidget, gsl::not_null<Window::Controller*> controller, Ui::ScrollArea *scroll, History *history) : TWidget(nullptr)
+HistoryInner::HistoryInner(HistoryWidget *historyWidget, not_null<Window::Controller*> controller, Ui::ScrollArea *scroll, History *history) : TWidget(nullptr)
 , _controller(controller)
 , _peer(history->peer)
-, _migrated(history->peer->migrateFrom() ? App::history(history->peer->migrateFrom()->id) : nullptr)
+, _migrated(history->migrateFrom())
 , _history(history)
 , _widget(historyWidget)
 , _scroll(scroll)
@@ -114,7 +116,7 @@ HistoryInner::HistoryInner(HistoryWidget *historyWidget, gsl::not_null<Window::C
 	subscribe(_controller->window()->dragFinished(), [this] {
 		mouseActionUpdate(QCursor::pos());
 	});
-	subscribe(AuthSession::Current().data().historyCleared(), [this](gsl::not_null<History*> history) {
+	subscribe(Auth().data().historyCleared(), [this](not_null<History*> history) {
 		if (_history == history) {
 			mouseActionCancel();
 		}
@@ -182,9 +184,9 @@ void HistoryInner::enumerateItemsInHistory(History *history, int historytop, Met
 
 			// Binary search should've skipped all the items that are above / below the visible area.
 			if (TopToBottom) {
-				t_assert(itembottom > _visibleAreaTop);
+				Assert(itembottom > _visibleAreaTop);
 			} else {
-				t_assert(itemtop < _visibleAreaBottom);
+				Assert(itemtop < _visibleAreaBottom);
 			}
 
 			if (!method(item, itemtop, itembottom)) {
@@ -254,7 +256,7 @@ void HistoryInner::enumerateUserpics(Method method) {
 	// -1 means we didn't find an attached to next message yet.
 	int lowestAttachedItemTop = -1;
 
-	auto userpicCallback = [this, &lowestAttachedItemTop, &method](gsl::not_null<HistoryItem*> item, int itemtop, int itembottom) {
+	auto userpicCallback = [this, &lowestAttachedItemTop, &method](not_null<HistoryItem*> item, int itemtop, int itembottom) {
 		// Skip all service messages.
 		auto message = item->toHistoryMessage();
 		if (!message) return true;
@@ -302,7 +304,7 @@ void HistoryInner::enumerateDates(Method method) {
 	// -1 means we didn't find a same-day with previous message yet.
 	auto lowestInOneDayItemBottom = -1;
 
-	auto dateCallback = [this, &lowestInOneDayItemBottom, &method, drawtop](gsl::not_null<HistoryItem*> item, int itemtop, int itembottom) {
+	auto dateCallback = [this, &lowestInOneDayItemBottom, &method, drawtop](not_null<HistoryItem*> item, int itemtop, int itembottom) {
 		if (lowestInOneDayItemBottom < 0 && item->isInOneDayWithPrevious()) {
 			lowestInOneDayItemBottom = itembottom - item->marginBottom();
 		}
@@ -382,6 +384,8 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 		HistoryLayout::paintEmpty(p, width(), height());
 	}
 	if (!noHistoryDisplayed) {
+		auto readMentions = HistoryItemsMap();
+
 		adjustCurrent(clip.top());
 
 		auto selEnd = _selected.cend();
@@ -425,6 +429,10 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 
 				if (item->hasViews()) {
 					App::main()->scheduleViewIncrement(item);
+				}
+				if (item->mentionsMe() && item->isMediaUnread()) {
+					readMentions.insert(item);
+					_widget->enqueueMessageHighlight(item);
 				}
 
 				int32 h = item->height();
@@ -473,6 +481,10 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 					if (item->hasViews()) {
 						App::main()->scheduleViewIncrement(item);
 					}
+					if (item->mentionsMe() && item->isMediaUnread()) {
+						readMentions.insert(item);
+						_widget->enqueueMessageHighlight(item);
+					}
 				}
 				p.translate(0, h);
 				y += h;
@@ -491,8 +503,12 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			p.restore();
 		}
 
+		if (!readMentions.empty() && App::wnd()->doWeReadMentions()) {
+			App::main()->mediaMarkRead(readMentions);
+		}
+
 		if (mtop >= 0 || htop >= 0) {
-			enumerateUserpics([&p, &clip](gsl::not_null<HistoryMessage*> message, int userpicTop) {
+			enumerateUserpics([&p, &clip](not_null<HistoryMessage*> message, int userpicTop) {
 				// stop the enumeration if the userpic is below the painted rect
 				if (userpicTop >= clip.top() + clip.height()) {
 					return false;
@@ -515,7 +531,7 @@ void HistoryInner::paintEvent(QPaintEvent *e) {
 			//int showFloatingBefore = height() - 2 * (_visibleAreaBottom - _visibleAreaTop) - dateHeight;
 
 			auto scrollDateOpacity = _scrollDateOpacity.current(ms, _scrollDateShown ? 1. : 0.);
-			enumerateDates([&p, &clip, scrollDateOpacity, dateHeight/*, lastDate, showFloatingBefore*/](gsl::not_null<HistoryItem*> item, int itemtop, int dateTop) {
+			enumerateDates([&p, &clip, scrollDateOpacity, dateHeight/*, lastDate, showFloatingBefore*/](not_null<HistoryItem*> item, int itemtop, int dateTop) {
 				// stop the enumeration if the date is above the painted rect
 				if (dateTop + dateHeight <= clip.top()) {
 					return false;
@@ -1291,7 +1307,8 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 					if (media->type() == MediaTypeSticker) {
 						if (auto document = media->getDocument()) {
 							if (document->sticker() && document->sticker()->set.type() != mtpc_inputStickerSetEmpty) {
-								_menu->addAction(lang(document->sticker()->setInstalled() ? lng_context_pack_info : lng_context_pack_add), [this] { showStickerPackInfo(); });
+								_menu->addAction(lang(document->sticker()->setInstalled() ? lng_context_pack_info : lng_context_pack_add), [this, document] { showStickerPackInfo(document); });
+								_menu->addAction(lang(Stickers::IsFaved(document) ? lng_faved_stickers_remove : lng_faved_stickers_add), [this, document] { toggleFavedSticker(document); });
 							}
 							_menu->addAction(lang(lng_context_save_image), App::LambdaDelayed(st::defaultDropdownMenu.menu.ripple.hideDuration, this, [this, document] {
 								saveDocumentToFile(document);
@@ -1410,18 +1427,19 @@ void HistoryInner::copyContextImage(PhotoData *photo) {
 	QApplication::clipboard()->setPixmap(photo->full->pix());
 }
 
-void HistoryInner::showStickerPackInfo() {
-	if (!App::contextItem()) return;
-
-	if (auto media = App::contextItem()->getMedia()) {
-		if (auto doc = media->getDocument()) {
-			if (auto sticker = doc->sticker()) {
-				if (sticker->set.type() != mtpc_inputStickerSetEmpty) {
-					App::main()->stickersBox(sticker->set);
-				}
-			}
+void HistoryInner::showStickerPackInfo(DocumentData *document) {
+	if (auto sticker = document->sticker()) {
+		if (sticker->set.type() != mtpc_inputStickerSetEmpty) {
+			App::main()->stickersBox(sticker->set);
 		}
 	}
+}
+
+void HistoryInner::toggleFavedSticker(DocumentData *document) {
+	auto unfave = Stickers::IsFaved(document);
+	MTP::send(MTPmessages_FaveSticker(document->mtpInput(), MTP_bool(unfave)), rpcDone([document, unfave](const MTPBool &result) {
+		Stickers::SetFaved(document, !unfave);
+	}));
 }
 
 void HistoryInner::cancelContextDownload() {
@@ -1460,7 +1478,7 @@ void HistoryInner::openContextGif() {
 	if (auto item = App::contextItem()) {
 		if (auto media = item->getMedia()) {
 			if (auto document = media->getDocument()) {
-				_controller->window()->showDocument(document, item);
+				Messenger::Instance().showDocument(document, item);
 			}
 		}
 	}
@@ -1852,7 +1870,7 @@ void HistoryInner::adjustCurrent(int32 y) const {
 }
 
 void HistoryInner::adjustCurrent(int32 y, History *history) const {
-	t_assert(!history->isEmpty());
+	Assert(!history->isEmpty());
 	_curHistory = history;
 	if (_curBlock >= history->blocks.size()) {
 		_curBlock = history->blocks.size() - 1;
@@ -2037,7 +2055,7 @@ void HistoryInner::onUpdateSelected() {
 
 		auto dateHeight = st::msgServicePadding.bottom() + st::msgServiceFont->height + st::msgServicePadding.top();
 		auto scrollDateOpacity = _scrollDateOpacity.current(_scrollDateShown ? 1. : 0.);
-		enumerateDates([this, &dragState, &lnkhost, &point, scrollDateOpacity, dateHeight/*, lastDate, showFloatingBefore*/](gsl::not_null<HistoryItem*> item, int itemtop, int dateTop) {
+		enumerateDates([this, &dragState, &lnkhost, &point, scrollDateOpacity, dateHeight/*, lastDate, showFloatingBefore*/](not_null<HistoryItem*> item, int itemtop, int dateTop) {
 			// stop enumeration if the date is above our point
 			if (dateTop + dateHeight <= point.y()) {
 				return false;
@@ -2096,7 +2114,7 @@ void HistoryInner::onUpdateSelected() {
 			if (!dragState.link && m.x() >= st::historyPhotoLeft && m.x() < st::historyPhotoLeft + st::msgPhotoSize) {
 				if (auto msg = item->toHistoryMessage()) {
 					if (msg->hasFromPhoto()) {
-						enumerateUserpics([&dragState, &lnkhost, &point](gsl::not_null<HistoryMessage*> message, int userpicTop) -> bool {
+						enumerateUserpics([&dragState, &lnkhost, &point](not_null<HistoryMessage*> message, int userpicTop) -> bool {
 							// stop enumeration if the userpic is below our point
 							if (userpicTop > point.y()) {
 								return false;
@@ -2266,11 +2284,11 @@ int HistoryInner::historyScrollTop() const {
 	auto htop = historyTop();
 	auto mtop = migratedTop();
 	if (htop >= 0 && _history->scrollTopItem) {
-		t_assert(!_history->scrollTopItem->detached());
+		Assert(!_history->scrollTopItem->detached());
 		return htop + _history->scrollTopItem->block()->y() + _history->scrollTopItem->y() + _history->scrollTopOffset;
 	}
 	if (mtop >= 0 && _migrated->scrollTopItem) {
-		t_assert(!_migrated->scrollTopItem->detached());
+		Assert(!_migrated->scrollTopItem->detached());
 		return mtop + _migrated->scrollTopItem->block()->y() + _migrated->scrollTopItem->y() + _migrated->scrollTopOffset;
 	}
 	return ScrollMax;
@@ -2307,7 +2325,7 @@ void HistoryInner::notifyIsBotChanged() {
 	if (newinfo) {
 		_botAbout.reset(new BotAbout(this, newinfo));
 		if (newinfo && !newinfo->inited) {
-			AuthSession::Current().api().requestFullPeer(_peer);
+			Auth().api().requestFullPeer(_peer);
 		}
 	} else {
 		_botAbout = nullptr;
@@ -2315,7 +2333,7 @@ void HistoryInner::notifyIsBotChanged() {
 }
 
 void HistoryInner::notifyMigrateUpdated() {
-	_migrated = _peer->migrateFrom() ? App::history(_peer->migrateFrom()->id) : 0;
+	_migrated = _history->migrateFrom();
 }
 
 int HistoryInner::moveScrollFollowingInlineKeyboard(const HistoryItem *item, int oldKeyboardTop, int newKeyboardTop) {

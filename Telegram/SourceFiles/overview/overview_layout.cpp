@@ -41,7 +41,7 @@ namespace Layout {
 namespace {
 
 TextParseOptions _documentNameOptions = {
-	TextParseMultiline | TextParseRichText | TextParseLinks | TextParseHashtags | TextParseMentions | TextParseBotCommands | TextParseMarkdown, // flags
+	TextParseMultiline | TextParseRichText | TextParseLinks | TextParseMarkdown, // flags
 	0, // maxw
 	0, // maxh
 	Qt::LayoutDirectionAuto, // dir
@@ -501,7 +501,7 @@ Voice::Voice(DocumentData *voice, HistoryItem *parent, const style::OverviewFile
 , _st(st) {
 	AddComponents(Info::Bit());
 
-	t_assert(_data->voice() != 0);
+	Assert(_data->voice() != 0);
 
 	setDocumentLinks(_data);
 

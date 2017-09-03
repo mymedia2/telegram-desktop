@@ -27,6 +27,9 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 
 #include "base/build_config.h"
 
+template <typename Type>
+using not_null = gsl::not_null<Type>;
+
 // Custom libc++ build used for old OS X versions already has this.
 #ifndef OS_MAC_OLD
 
@@ -60,27 +63,3 @@ using float64 = double;
 
 #define qsl(s) QStringLiteral(s)
 #define qstr(s) QLatin1String(s, sizeof(s) - 1)
-
-// For QFlags<> declared in private section of a class we need to declare
-// operators from Q_DECLARE_OPERATORS_FOR_FLAGS as friend functions.
-#ifndef OS_MAC_OLD
-
-#define Q_DECLARE_FRIEND_INCOMPATIBLE_FLAGS(Flags) \
-friend Q_DECL_CONSTEXPR QIncompatibleFlag operator|(Flags::enum_type f1, int f2) Q_DECL_NOTHROW;
-
-#define Q_DECLARE_FRIEND_OPERATORS_FOR_FLAGS(Flags) \
-friend Q_DECL_CONSTEXPR QFlags<Flags::enum_type> operator|(Flags::enum_type f1, Flags::enum_type f2) Q_DECL_NOTHROW; \
-friend Q_DECL_CONSTEXPR QFlags<Flags::enum_type> operator|(Flags::enum_type f1, QFlags<Flags::enum_type> f2) Q_DECL_NOTHROW; \
-Q_DECLARE_FRIEND_INCOMPATIBLE_FLAGS(Flags)
-
-#else // OS_MAC_OLD
-
-#define Q_DECLARE_FRIEND_INCOMPATIBLE_FLAGS(Flags) \
-friend Q_DECL_CONSTEXPR QIncompatibleFlag operator|(Flags::enum_type f1, int f2);
-
-#define Q_DECLARE_FRIEND_OPERATORS_FOR_FLAGS(Flags) \
-friend Q_DECL_CONSTEXPR QFlags<Flags::enum_type> operator|(Flags::enum_type f1, Flags::enum_type f2); \
-friend Q_DECL_CONSTEXPR QFlags<Flags::enum_type> operator|(Flags::enum_type f1, QFlags<Flags::enum_type> f2); \
-Q_DECLARE_FRIEND_INCOMPATIBLE_FLAGS(Flags)
-
-#endif // OS_MAC_OLD

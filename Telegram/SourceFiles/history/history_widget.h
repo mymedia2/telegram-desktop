@@ -27,6 +27,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "window/section_widget.h"
 #include "core/single_timer.h"
 #include "ui/widgets/input_fields.h"
+#include "base/flags.h"
 
 namespace InlineBots {
 namespace Layout {
@@ -170,7 +171,7 @@ class HistoryWidget final : public Window::AbstractSectionWidget, public RPCSend
 	Q_OBJECT
 
 public:
-	HistoryWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller);
+	HistoryWidget(QWidget *parent, not_null<Window::Controller*> controller);
 
 	void start();
 
@@ -179,6 +180,7 @@ public:
 
 	void windowShown();
 	bool doWeReadServerHistory() const;
+	bool doWeReadMentions() const;
 
 	void leaveToChildEvent(QEvent *e, QWidget *child) override;
 	void dragEnterEvent(QDragEnterEvent *e) override;
@@ -261,8 +263,8 @@ public:
 
 	bool touchScroll(const QPoint &delta);
 
-	uint64 animActiveTimeStart(const HistoryItem *msg) const;
-	void stopAnimActive();
+	void enqueueMessageHighlight(not_null<HistoryItem*> item);
+	TimeMs highlightStartTime(not_null<const HistoryItem*> item) const;
 
 	SelectedItemSet getSelectedItems() const;
 	void itemEdited(HistoryItem *item);
@@ -316,6 +318,8 @@ public:
 
 	void updateHistoryDownPosition();
 	void updateHistoryDownVisibility();
+	void updateUnreadMentionsPosition();
+	void updateUnreadMentionsVisibility();
 
 	void updateFieldSubmitSettings();
 
@@ -346,9 +350,9 @@ public:
 	bool wheelEventFromFloatPlayer(QEvent *e, Window::Column myColumn, Window::Column playerColumn) override;
 	QRect rectForFloatPlayer(Window::Column myColumn, Window::Column playerColumn) override;
 
-	void app_sendBotCallback(const HistoryMessageReplyMarkup::Button *button, gsl::not_null<const HistoryItem*> msg, int row, int col);
+	void app_sendBotCallback(const HistoryMessageReplyMarkup::Button *button, not_null<const HistoryItem*> msg, int row, int col);
 
-	void ui_repaintHistoryItem(gsl::not_null<const HistoryItem*> item);
+	void ui_repaintHistoryItem(not_null<const HistoryItem*> item);
 	PeerData *ui_getPeerForMouseAction();
 
 	void notify_historyItemLayoutChanged(const HistoryItem *item);
@@ -395,8 +399,6 @@ public slots:
 	void onPreviewCheck();
 	void onPreviewTimeout();
 
-	void peerUpdated(PeerData *data);
-
 	void onPhotoUploaded(const FullMsgId &msgId, bool silent, const MTPInputFile &file);
 	void onDocumentUploaded(const FullMsgId &msgId, bool silent, const MTPInputFile &file);
 	void onThumbDocumentUploaded(const FullMsgId &msgId, bool silent, const MTPInputFile &file, const MTPInputFile &thumb);
@@ -412,7 +414,6 @@ public slots:
 	void onReportSpamClear();
 
 	void onScroll();
-	void onHistoryToEnd();
 	void onSend(bool ctrlShiftEnter = false, MsgId replyTo = -1);
 
 	void onUnblock();
@@ -425,7 +426,6 @@ public slots:
 	void onCmdStart();
 
 	void activate();
-	void onStickersUpdated();
 	void onTextChange();
 
 	void onFieldTabbed();
@@ -446,13 +446,9 @@ public slots:
 	void onForwardSelected();
 	void onClearSelected();
 
-	void onAnimActiveStep();
-
 	void onDraftSaveDelayed();
 	void onDraftSave(bool delayed = false);
 	void onCloudDraftSave();
-
-	void updateStickers();
 
 	void onRecordError();
 	void onRecordDone(QByteArray result, VoiceWaveform waveform, qint32 samples);
@@ -491,6 +487,16 @@ private:
 	void updateTabbedSelectorSectionShown();
 	void recountChatWidth();
 	void setReportSpamStatus(DBIPeerReportSpamStatus status);
+	void historyDownClicked();
+	void showNextUnreadMention();
+	void handlePeerUpdate();
+
+	void highlightMessage(MsgId universalMessageId);
+	void adjustHighlightedMessageToMigrated();
+	void checkNextHighlight();
+	void updateHighlightedMessage();
+	void clearHighlightMessages();
+	void stopMessageHighlight();
 
 	void animationCallback();
 	void updateOverStates(QPoint pos);
@@ -499,6 +505,7 @@ private:
 	void recordUpdateCallback(QPoint globalPos);
 	void chooseAttach();
 	void historyDownAnimationFinish();
+	void unreadMentionsAnimationFinish();
 	void sendButtonClicked();
 	SendingFilesLists getSendingFilesLists(const QList<QUrl> &files);
 	SendingFilesLists getSendingFilesLists(const QStringList &files);
@@ -661,7 +668,7 @@ private:
 	// Counts scrollTop for placing the scroll right at the unread
 	// messages bar, choosing from _history and _migrated unreadBar.
 	int unreadBarTop() const;
-	int itemTopForHighlight(gsl::not_null<HistoryItem*> item) const;
+	int itemTopForHighlight(not_null<HistoryItem*> item) const;
 	void scrollToCurrentVoiceMessage(FullMsgId fromId, FullMsgId toId);
 
 	// Scroll to current y without updating the _lastUserScrolled time.
@@ -683,28 +690,12 @@ private:
 
 	void countHistoryShowFrom();
 
-	mtpRequestId _stickersUpdateRequest = 0;
-	void stickersGot(const MTPmessages_AllStickers &stickers);
-	bool stickersFailed(const RPCError &error);
-
-	mtpRequestId _recentStickersUpdateRequest = 0;
-	void recentStickersGot(const MTPmessages_RecentStickers &stickers);
-	bool recentStickersFailed(const RPCError &error);
-
-	mtpRequestId _featuredStickersUpdateRequest = 0;
-	void featuredStickersGot(const MTPmessages_FeaturedStickers &stickers);
-	bool featuredStickersFailed(const RPCError &error);
-
-	mtpRequestId _savedGifsUpdateRequest = 0;
-	void savedGifsGot(const MTPmessages_SavedGifs &gifs);
-	bool savedGifsFailed(const RPCError &error);
-
 	enum class TextUpdateEvent {
 		SaveDraft  = 0x01,
 		SendTyping = 0x02,
 	};
-	Q_DECLARE_FLAGS(TextUpdateEvents, TextUpdateEvent);
-	Q_DECLARE_FRIEND_OPERATORS_FOR_FLAGS(TextUpdateEvents);
+	using TextUpdateEvents = base::flags<TextUpdateEvent>;
+	friend inline constexpr auto is_flag_type(TextUpdateEvent) { return true; };
 
 	void writeDrafts(Data::Draft **localDraft, Data::Draft **editDraft);
 	void writeDrafts(History *history);
@@ -716,7 +707,7 @@ private:
 	HistoryItem *getItemFromHistoryOrMigrated(MsgId genericMsgId) const;
 	void animatedScrollToItem(MsgId msgId);
 	void animatedScrollToY(int scrollTo, HistoryItem *attachTo = nullptr);
-	void highlightMessage(HistoryItem *context);
+
 	void updateDragAreas();
 
 	// when scroll position or scroll area size changed this method
@@ -744,8 +735,6 @@ private:
 	MsgId _delayedShowAtMsgId = -1; // wtf?
 	mtpRequestId _delayedShowAtRequest = 0;
 
-	MsgId _activeAnimMsgId = 0;
-
 	object_ptr<Ui::AbstractButton> _backAnimationButton = { nullptr };
 	object_ptr<Window::TopBarWidget> _topBar;
 	object_ptr<Ui::ScrollArea> _scroll;
@@ -767,6 +756,10 @@ private:
 	Animation _historyDownShown;
 	bool _historyDownIsShown = false;
 	object_ptr<Ui::HistoryDownButton> _historyDown;
+
+	Animation _unreadMentionsShown;
+	bool _unreadMentionsIsShown = false;
+	object_ptr<Ui::HistoryDownButton> _unreadMentions;
 
 	object_ptr<FieldAutocomplete> _fieldAutocomplete;
 
@@ -841,7 +834,7 @@ private:
 	bool _nonEmptySelection = false;
 
 	TaskQueue _fileLoader;
-	TextUpdateEvents _textUpdateEvents = (TextUpdateEvent::SaveDraft | TextUpdateEvent::SendTyping);
+	TextUpdateEvents _textUpdateEvents = (TextUpdateEvents() | TextUpdateEvent::SaveDraft | TextUpdateEvent::SendTyping);
 
 	int64 _serviceImageCacheSize = 0;
 	QString _confirmSource;
@@ -857,8 +850,10 @@ private:
 	QTimer _scrollTimer;
 	int32 _scrollDelta = 0;
 
-	QTimer _animActiveTimer;
-	float64 _animActiveStart = 0;
+	MsgId _highlightedMessageId = 0;
+	std::deque<MsgId> _highlightQueue;
+	base::Timer _highlightTimer;
+	TimeMs _highlightStart = 0;
 
 	QMap<QPair<History*, SendAction::Type>, mtpRequestId> _sendActionRequests;
 	QTimer _sendActionStopTimer;
@@ -872,5 +867,3 @@ private:
 	bool _inGrab = false;
 
 };
-
-Q_DECLARE_OPERATORS_FOR_FLAGS(HistoryWidget::TextUpdateEvents)

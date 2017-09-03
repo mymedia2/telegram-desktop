@@ -44,7 +44,7 @@ namespace {
 constexpr auto kUpdateFullPeerTimeout = TimeMs(5000); // Not more than once in 5 seconds.
 
 int peerColorIndex(const PeerId &peer) {
-	auto myId = AuthSession::CurrentUserId();
+	auto myId = Auth().userId();
 	auto peerId = peerToBareInt(peer);
 	auto both = (QByteArray::number(peerId) + QByteArray::number(myId)).mid(0, 15);
 	uchar md5[16];
@@ -250,7 +250,7 @@ using UpdateFlag = Notify::PeerUpdate::Flag;
 NotifySettings globalNotifyAll, globalNotifyUsers, globalNotifyChats;
 NotifySettingsPtr globalNotifyAllPtr = UnknownNotifySettings, globalNotifyUsersPtr = UnknownNotifySettings, globalNotifyChatsPtr = UnknownNotifySettings;
 
-PeerClickHandler::PeerClickHandler(gsl::not_null<PeerData*> peer) : _peer(peer) {
+PeerClickHandler::PeerClickHandler(not_null<PeerData*> peer) : _peer(peer) {
 }
 
 void PeerClickHandler::onClick(Qt::MouseButton button) const {
@@ -317,10 +317,7 @@ void PeerData::updateNameDelayed(const QString &newName, const QString &newNameO
 		}
 	}
 	fillNames();
-	if (App::main()) {
-		emit App::main()->peerNameChanged(this, update.oldNames, update.oldNameFirstChars);
-	}
-	Notify::peerUpdatedDelayed(update);
+	Notify::PeerUpdated().notify(update, true);
 }
 
 ClickHandlerPtr PeerData::createOpenLink() {
@@ -453,9 +450,6 @@ void UserData::setPhoto(const MTPUserProfilePhoto &p) { // see Local::readPeer a
 		photoId = newPhotoId;
 		setUserpic(newPhoto);
 		photoLoc = newPhotoLoc;
-		if (App::main()) {
-			emit App::main()->peerPhotoChanged(this);
-		}
 		Notify::peerUpdatedDelayed(this, UpdateFlag::PhotoChanged);
 	}
 }
@@ -489,6 +483,13 @@ bool UserData::setAbout(const QString &newAbout) {
 	_about = newAbout;
 	Notify::peerUpdatedDelayed(this, UpdateFlag::AboutChanged);
 	return true;
+}
+
+void UserData::setRestrictionReason(const QString &text) {
+	if (_restrictionReason != text) {
+		_restrictionReason = text;
+		Notify::peerUpdatedDelayed(this, Notify::PeerUpdate::Flag::RestrictionReasonChanged);
+	}
 }
 
 void UserData::setCommonChatsCount(int count) {
@@ -605,11 +606,9 @@ void UserData::madeAction(TimeId when) {
 
 	if (onlineTill <= 0 && -onlineTill < when) {
 		onlineTill = -when - SetOnlineAfterActivity;
-		App::markPeerUpdated(this);
 		Notify::peerUpdatedDelayed(this, Notify::PeerUpdate::Flag::UserOnlineChanged);
 	} else if (onlineTill > 0 && onlineTill < when + 1) {
 		onlineTill = when + SetOnlineAfterActivity;
-		App::markPeerUpdated(this);
 		Notify::peerUpdatedDelayed(this, Notify::PeerUpdate::Flag::UserOnlineChanged);
 	}
 }
@@ -657,9 +656,6 @@ void ChatData::setPhoto(const MTPChatPhoto &p, const PhotoId &phId) { // see Loc
 		photoId = newPhotoId;
 		setUserpic(newPhoto);
 		photoLoc = newPhotoLoc;
-		if (App::main()) {
-			emit App::main()->peerPhotoChanged(this);
-		}
 		Notify::peerUpdatedDelayed(this, UpdateFlag::PhotoChanged);
 	}
 }
@@ -713,9 +709,6 @@ void ChannelData::setPhoto(const MTPChatPhoto &p, const PhotoId &phId) { // see 
 		photoId = newPhotoId;
 		setUserpic(newPhoto);
 		photoLoc = newPhotoLoc;
-		if (App::main()) {
-			emit App::main()->peerPhotoChanged(this);
-		}
 		Notify::peerUpdatedDelayed(this, UpdateFlag::PhotoChanged);
 	}
 }
@@ -731,12 +724,10 @@ void PeerData::updateFull() {
 }
 
 void PeerData::updateFullForced() {
-	if (App::api()) {
-		App::api()->requestFullPeer(this);
-		if (auto channel = asChannel()) {
-			if (!channel->amCreator() && !channel->inviter) {
-				App::api()->requestSelfParticipant(channel);
-			}
+	Auth().api().requestFullPeer(this);
+	if (auto channel = asChannel()) {
+		if (!channel->amCreator() && !channel->inviter) {
+			Auth().api().requestSelfParticipant(channel);
 		}
 	}
 }
@@ -799,7 +790,7 @@ MTPChannelBannedRights ChannelData::KickedRestrictedRights() {
 	return MTP_channelBannedRights(MTP_flags(flags), MTP_int(std::numeric_limits<int32>::max()));
 }
 
-void ChannelData::applyEditAdmin(gsl::not_null<UserData*> user, const MTPChannelAdminRights &oldRights, const MTPChannelAdminRights &newRights) {
+void ChannelData::applyEditAdmin(not_null<UserData*> user, const MTPChannelAdminRights &oldRights, const MTPChannelAdminRights &newRights) {
 	auto flags = Notify::PeerUpdate::Flag::AdminsChanged | Notify::PeerUpdate::Flag::None;
 	if (mgInfo) {
 		if (!mgInfo->lastParticipants.contains(user)) { // If rights are empty - still add participant? TODO check
@@ -841,23 +832,20 @@ void ChannelData::applyEditAdmin(gsl::not_null<UserData*> user, const MTPChannel
 		// We removed an admin.
 		if (adminsCount() > 1) {
 			setAdminsCount(adminsCount() - 1);
-			if (App::main()) emit App::main()->peerUpdated(this);
 		}
 		if (!isMegagroup() && user->botInfo && membersCount() > 1) {
 			// Removing bot admin removes it from channel.
 			setMembersCount(membersCount() - 1);
-			if (App::main()) emit App::main()->peerUpdated(this);
 		}
 	} else if (!oldRights.c_channelAdminRights().vflags.v && newRights.c_channelAdminRights().vflags.v) {
 		// We added an admin.
 		setAdminsCount(adminsCount() + 1);
-		if (App::main()) emit App::main()->peerUpdated(this);
 		updateFullForced();
 	}
 	Notify::peerUpdatedDelayed(this, flags);
 }
 
-void ChannelData::applyEditBanned(gsl::not_null<UserData*> user, const MTPChannelBannedRights &oldRights, const MTPChannelBannedRights &newRights) {
+void ChannelData::applyEditBanned(not_null<UserData*> user, const MTPChannelBannedRights &oldRights, const MTPChannelBannedRights &newRights) {
 	auto flags = Notify::PeerUpdate::Flag::BannedUsersChanged | Notify::PeerUpdate::Flag::None;
 	if (mgInfo) {
 		if (mgInfo->lastAdmins.contains(user)) { // If rights are empty - still remove admin? TODO check
@@ -920,7 +908,14 @@ void ChannelData::flagsUpdated() {
 	}
 }
 
-bool ChannelData::canNotEditLastAdmin(gsl::not_null<UserData*> user) const {
+void ChannelData::setRestrictionReason(const QString &text) {
+	if (_restrictionReason != text) {
+		_restrictionReason = text;
+		Notify::peerUpdatedDelayed(this, Notify::PeerUpdate::Flag::RestrictionReasonChanged);
+	}
+}
+
+bool ChannelData::canNotEditLastAdmin(not_null<UserData*> user) const {
 	if (mgInfo) {
 		auto i = mgInfo->lastAdmins.constFind(user);
 		if (i != mgInfo->lastAdmins.cend()) {
@@ -931,7 +926,7 @@ bool ChannelData::canNotEditLastAdmin(gsl::not_null<UserData*> user) const {
 	return false;
 }
 
-bool ChannelData::canEditAdmin(gsl::not_null<UserData*> user) const {
+bool ChannelData::canEditAdmin(not_null<UserData*> user) const {
 	if (user->isSelf()) {
 		return false;
 	} else if (amCreator()) {
@@ -942,7 +937,7 @@ bool ChannelData::canEditAdmin(gsl::not_null<UserData*> user) const {
 	return adminRights().is_add_admins();
 }
 
-bool ChannelData::canRestrictUser(gsl::not_null<UserData*> user) const {
+bool ChannelData::canRestrictUser(not_null<UserData*> user) const {
 	if (user->isSelf()) {
 		return false;
 	} else if (amCreator()) {
@@ -1032,13 +1027,13 @@ void PtsWaiter::applySkippedUpdates(ChannelData *channel) {
 
 	setWaitingForSkipped(channel, -1);
 
-	if (!App::api() || _queue.isEmpty()) return;
+	if (_queue.isEmpty()) return;
 
 	++_applySkippedLevel;
-	for (QMap<uint64, PtsSkippedQueue>::const_iterator i = _queue.cbegin(), e = _queue.cend(); i != e; ++i) {
+	for (auto i = _queue.cbegin(), e = _queue.cend(); i != e; ++i) {
 		switch (i.value()) {
-		case SkippedUpdate: App::api()->applyUpdateNoPtsCheck(_updateQueue.value(i.key())); break;
-		case SkippedUpdates: App::api()->applyUpdatesNoPtsCheck(_updatesQueue.value(i.key())); break;
+		case SkippedUpdate: Auth().api().applyUpdateNoPtsCheck(_updateQueue.value(i.key())); break;
+		case SkippedUpdates: Auth().api().applyUpdatesNoPtsCheck(_updatesQueue.value(i.key())); break;
 		}
 	}
 	--_applySkippedLevel;
@@ -1091,7 +1086,7 @@ bool PtsWaiter::updateAndApply(ChannelData *channel, int32 pts, int32 count, con
 	}
 	if (!_waitingForSkipped || _queue.isEmpty()) {
 		// Optimization - no need to put in queue and back.
-		App::api()->applyUpdatesNoPtsCheck(updates);
+		Auth().api().applyUpdatesNoPtsCheck(updates);
 	} else {
 		_updatesQueue.insert(ptsKey(SkippedUpdates, pts), updates);
 		applySkippedUpdates(channel);
@@ -1105,7 +1100,7 @@ bool PtsWaiter::updateAndApply(ChannelData *channel, int32 pts, int32 count, con
 	}
 	if (!_waitingForSkipped || _queue.isEmpty()) {
 		// Optimization - no need to put in queue and back.
-		App::api()->applyUpdateNoPtsCheck(update);
+		Auth().api().applyUpdateNoPtsCheck(update);
 	} else {
 		_updateQueue.insert(ptsKey(SkippedUpdate, pts), update);
 		applySkippedUpdates(channel);
@@ -1236,7 +1231,7 @@ ImagePtr PhotoData::makeReplyPreview() {
 }
 
 void PhotoOpenClickHandler::onClickImpl() const {
-	App::wnd()->showPhoto(this, App::hoveredLinkItem() ? App::hoveredLinkItem() : App::contextItem());
+	Messenger::Instance().showPhoto(this, App::hoveredLinkItem() ? App::hoveredLinkItem() : App::contextItem());
 }
 
 void PhotoSaveClickHandler::onClickImpl() const {
@@ -1374,7 +1369,7 @@ bool StickerData::setInstalled() const {
 		return (it != Global::StickerSets().cend()) && !(it->flags & MTPDstickerSet::Flag::f_archived) && (it->flags & MTPDstickerSet::Flag::f_installed);
 	} break;
 	case mtpc_inputStickerSetShortName: {
-		QString name = qs(set.c_inputStickerSetShortName().vshort_name).toLower();
+		auto name = qs(set.c_inputStickerSetShortName().vshort_name).toLower();
 		for (auto it = Global::StickerSets().cbegin(), e = Global::StickerSets().cend(); it != e; ++it) {
 			if (it->shortName.toLower() == name) {
 				return !(it->flags & MTPDstickerSet::Flag::f_archived) && (it->flags & MTPDstickerSet::Flag::f_installed);
@@ -1442,7 +1437,7 @@ void DocumentOpenClickHandler::doOpen(DocumentData *data, HistoryItem *context, 
 	auto &location = data->location(true);
 	if (auto applyTheme = data->isTheme()) {
 		if (!location.isEmpty() && location.accessEnable()) {
-			App::wnd()->showDocument(data, context);
+			Messenger::Instance().showDocument(data, context);
 			location.accessDisable();
 			return;
 		}
@@ -1480,9 +1475,9 @@ void DocumentOpenClickHandler::doOpen(DocumentData *data, HistoryItem *context, 
 			}
 		} else if (playVideo) {
 			if (!data->data().isEmpty()) {
-				App::wnd()->showDocument(data, context);
+				Messenger::Instance().showDocument(data, context);
 			} else if (location.accessEnable()) {
-				App::wnd()->showDocument(data, context);
+				Messenger::Instance().showDocument(data, context);
 				location.accessDisable();
 			} else {
 				auto filepath = location.name();
@@ -1502,14 +1497,14 @@ void DocumentOpenClickHandler::doOpen(DocumentData *data, HistoryItem *context, 
 				if (action == ActionOnLoadPlayInline && context && context->getMedia()) {
 					context->getMedia()->playInline();
 				} else {
-					App::wnd()->showDocument(data, context);
+					Messenger::Instance().showDocument(data, context);
 				}
 			} else if (location.accessEnable()) {
 				if (data->isAnimation() || QImageReader(location.name()).canRead()) {
 					if (action == ActionOnLoadPlayInline && context && context->getMedia()) {
 						context->getMedia()->playInline();
 					} else {
-						App::wnd()->showDocument(data, context);
+						Messenger::Instance().showDocument(data, context);
 					}
 				} else {
 					File::Launch(location.name());
@@ -1681,7 +1676,11 @@ void DocumentData::setattributes(const QVector<MTPDocumentAttribute> &attributes
 		}
 	}
 	if (type == StickerDocument) {
-		if (dimensions.width() <= 0 || dimensions.height() <= 0 || dimensions.width() > StickerMaxSize || dimensions.height() > StickerMaxSize || size > StickerInMemory) {
+		if (dimensions.width() <= 0
+			|| dimensions.height() <= 0
+			|| dimensions.width() > StickerMaxSize
+			|| dimensions.height() > StickerMaxSize
+			|| !saveToCache()) {
 			type = FileDocument;
 			_additional = nullptr;
 		}
@@ -1689,7 +1688,9 @@ void DocumentData::setattributes(const QVector<MTPDocumentAttribute> &attributes
 }
 
 bool DocumentData::saveToCache() const {
-	return (type == StickerDocument) || (isAnimation() && size < AnimationInMemory) || (voice() && size < AudioVoiceMsgInMemory);
+	return (type == StickerDocument && size < Storage::kMaxStickerInMemory)
+		|| (isAnimation() && size < Storage::kMaxAnimationInMemory)
+		|| (voice() && size < Storage::kMaxVoiceInMemory);
 }
 
 void DocumentData::forget() {
@@ -1750,7 +1751,7 @@ void DocumentData::performActionOnLoad() {
 	auto playAnimation = isAnimation() && (_actionOnLoad == ActionOnLoadPlayInline || _actionOnLoad == ActionOnLoadOpen) && showImage && item && item->getMedia();
 	if (auto applyTheme = isTheme()) {
 		if (!loc.isEmpty() && loc.accessEnable()) {
-			App::wnd()->showDocument(this, item);
+			Messenger::Instance().showDocument(this, item);
 			loc.accessDisable();
 			return;
 		}
@@ -1790,7 +1791,7 @@ void DocumentData::performActionOnLoad() {
 			if (_actionOnLoad == ActionOnLoadPlayInline && item->getMedia()) {
 				item->getMedia()->playInline();
 			} else {
-				App::wnd()->showDocument(this, item);
+				Messenger::Instance().showDocument(this, item);
 			}
 		}
 	} else {
@@ -1809,7 +1810,7 @@ void DocumentData::performActionOnLoad() {
 					if (_actionOnLoad == ActionOnLoadPlayInline && item && item->getMedia()) {
 						item->getMedia()->playInline();
 					} else {
-						App::wnd()->showDocument(this, item);
+						Messenger::Instance().showDocument(this, item);
 					}
 				} else {
 					File::Launch(already);
@@ -1844,7 +1845,7 @@ bool DocumentData::loaded(FilePathResolveType type) const {
 void DocumentData::destroyLoaderDelayed(mtpFileLoader *newValue) const {
 	_loader->stop();
 	auto loader = std::unique_ptr<FileLoader>(std::exchange(_loader, newValue));
-	AuthSession::Current().downloader().delayedDestroyLoader(std::move(loader));
+	Auth().downloader().delayedDestroyLoader(std::move(loader));
 }
 
 bool DocumentData::loading() const {
@@ -1933,7 +1934,7 @@ void DocumentData::cancel() {
 	auto loader = std::unique_ptr<FileLoader>(std::exchange(_loader, CancelledMtpFileLoader));
 	loader->cancel();
 	loader->stop();
-	AuthSession::Current().downloader().delayedDestroyLoader(std::move(loader));
+	Auth().downloader().delayedDestroyLoader(std::move(loader));
 
 	notifyLayoutChanged();
 	if (auto main = App::main()) {
@@ -2193,6 +2194,6 @@ GameData::GameData(const GameId &id, const uint64 &accessHash, const QString &sh
 
 MsgId clientMsgId() {
 	static MsgId currentClientMsgId = StartClientMsgId;
-	t_assert(currentClientMsgId < EndClientMsgId);
+	Assert(currentClientMsgId < EndClientMsgId);
 	return currentClientMsgId++;
 }

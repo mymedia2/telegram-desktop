@@ -24,6 +24,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "history/history_message.h"
 #include "history/history_admin_log_inner.h"
 #include "lang/lang_keys.h"
+#include "boxes/sticker_set_box.h"
 #include "messenger.h"
 
 namespace AdminLog {
@@ -113,7 +114,7 @@ const auto CollectChanges = [](auto &phraseMap, auto plusFlags, auto minusFlags)
 	return withPrefix(plusFlags & ~minusFlags, '+') + withPrefix(minusFlags & ~plusFlags, kMinus);
 };
 
-auto GenerateAdminChangeText(gsl::not_null<ChannelData*> channel, const TextWithEntities &user, const MTPChannelAdminRights *newRights, const MTPChannelAdminRights *prevRights) {
+auto GenerateAdminChangeText(not_null<ChannelData*> channel, const TextWithEntities &user, const MTPChannelAdminRights *newRights, const MTPChannelAdminRights *prevRights) {
 	using Flag = MTPDchannelAdminRights::Flag;
 	using Flags = MTPDchannelAdminRights::Flags;
 
@@ -137,6 +138,12 @@ auto GenerateAdminChangeText(gsl::not_null<ChannelData*> channel, const TextWith
 		{ Flag::f_add_admins, lng_admin_log_admin_add_admins },
 	};
 	phraseMap[inviteKey] = invitePhrase;
+
+	if (!channel->isMegagroup()) {
+		// Don't display "Ban users" changes in channels.
+		newFlags &= ~Flag::f_ban_users;
+		prevFlags &= ~Flag::f_ban_users;
+	}
 
 	auto changes = CollectChanges(phraseMap, newFlags, prevFlags);
 	if (!changes.isEmpty()) {
@@ -191,7 +198,7 @@ auto GenerateUserString(MTPint userId) {
 	return lng_admin_log_user_with_username__generic(lt_name, name, lt_mention, mention);
 }
 
-auto GenerateParticipantChangeTextInner(gsl::not_null<ChannelData*> channel, const MTPChannelParticipant &participant, const MTPChannelParticipant *oldParticipant) {
+auto GenerateParticipantChangeTextInner(not_null<ChannelData*> channel, const MTPChannelParticipant &participant, const MTPChannelParticipant *oldParticipant) {
 	auto oldType = oldParticipant ? oldParticipant->type() : 0;
 
 	auto resultForParticipant = [channel, oldParticipant, oldType](auto &&data) {
@@ -230,7 +237,7 @@ auto GenerateParticipantChangeTextInner(gsl::not_null<ChannelData*> channel, con
 	Unexpected("Participant type in GenerateParticipantChangeTextInner()");
 }
 
-TextWithEntities GenerateParticipantChangeText(gsl::not_null<ChannelData*> channel, const MTPChannelParticipant &participant, const MTPChannelParticipant *oldParticipant = nullptr) {
+TextWithEntities GenerateParticipantChangeText(not_null<ChannelData*> channel, const MTPChannelParticipant &participant, const MTPChannelParticipant *oldParticipant = nullptr) {
 	auto result = GenerateParticipantChangeTextInner(channel, participant, oldParticipant);
 	result.entities.push_front(EntityInText(EntityInTextItalic, 0, result.text.size()));
 	return result;
@@ -238,7 +245,7 @@ TextWithEntities GenerateParticipantChangeText(gsl::not_null<ChannelData*> chann
 
 } // namespace
 
-void GenerateItems(gsl::not_null<History*> history, LocalIdManager &idManager, const MTPDchannelAdminLogEvent &event, base::lambda<void(HistoryItemOwned item)> callback) {
+void GenerateItems(not_null<History*> history, LocalIdManager &idManager, const MTPDchannelAdminLogEvent &event, base::lambda<void(HistoryItemOwned item)> callback) {
 	Expects(history->peer->isChannel());
 
 	auto id = event.vid.v;
@@ -246,7 +253,7 @@ void GenerateItems(gsl::not_null<History*> history, LocalIdManager &idManager, c
 	auto channel = history->peer->asChannel();
 	auto &action = event.vaction;
 	auto date = event.vdate;
-	auto addPart = [&callback](gsl::not_null<HistoryItem*> item) {
+	auto addPart = [&callback](not_null<HistoryItem*> item) {
 		return callback(HistoryItemOwned(item));
 	};
 
@@ -412,6 +419,28 @@ void GenerateItems(gsl::not_null<History*> history, LocalIdManager &idManager, c
 		addPart(HistoryMessage::create(history, idManager.next(), bodyFlags, bodyReplyTo, bodyViaBotId, ::date(date), peerToUser(from->id), QString(), bodyText));
 	};
 
+	auto createChangeStickerSet = [&](const MTPDchannelAdminLogEventActionChangeStickerSet &action) {
+		auto set = action.vnew_stickerset;
+		auto removed = (set.type() == mtpc_inputStickerSetEmpty);
+		if (removed) {
+			auto text = lng_admin_log_removed_stickers_group(lt_from, fromLinkText);
+			addSimpleServiceMessage(text);
+		} else {
+			auto text = lng_admin_log_changed_stickers_group(
+				lt_from,
+				fromLinkText,
+				lt_sticker_set,
+				textcmdLink(2, lang(lng_admin_log_changed_stickers_set)));
+			auto setLink = MakeShared<LambdaClickHandler>([set] {
+				Ui::show(Box<StickerSetBox>(set));
+			});
+			auto message = HistoryService::PreparedText { text };
+			message.links.push_back(fromLink);
+			message.links.push_back(setLink);
+			addPart(HistoryService::create(history, idManager.next(), ::date(date), message, 0, peerToUser(from->id)));
+		}
+	};
+
 	switch (action.type()) {
 	case mtpc_channelAdminLogEventActionChangeTitle: createChangeTitle(action.c_channelAdminLogEventActionChangeTitle()); break;
 	case mtpc_channelAdminLogEventActionChangeAbout: createChangeAbout(action.c_channelAdminLogEventActionChangeAbout()); break;
@@ -427,6 +456,7 @@ void GenerateItems(gsl::not_null<History*> history, LocalIdManager &idManager, c
 	case mtpc_channelAdminLogEventActionParticipantInvite: createParticipantInvite(action.c_channelAdminLogEventActionParticipantInvite()); break;
 	case mtpc_channelAdminLogEventActionParticipantToggleBan: createParticipantToggleBan(action.c_channelAdminLogEventActionParticipantToggleBan()); break;
 	case mtpc_channelAdminLogEventActionParticipantToggleAdmin: createParticipantToggleAdmin(action.c_channelAdminLogEventActionParticipantToggleAdmin()); break;
+	case mtpc_channelAdminLogEventActionChangeStickerSet: createChangeStickerSet(action.c_channelAdminLogEventActionChangeStickerSet()); break;
 	default: Unexpected("channelAdminLogEventAction type in AdminLog::Item::Item()");
 	}
 }

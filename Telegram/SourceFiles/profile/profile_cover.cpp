@@ -29,10 +29,11 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "ui/widgets/labels.h"
 #include "observer_peer.h"
 #include "boxes/confirm_box.h"
-#include "boxes/contacts_box.h"
 #include "boxes/photo_crop_box.h"
+#include "boxes/peer_list_controllers.h"
 #include "lang/lang_keys.h"
 #include "apiwrap.h"
+#include "auth_session.h"
 #include "mainwidget.h"
 #include "mainwindow.h"
 #include "messenger.h"
@@ -77,8 +78,8 @@ CoverWidget::CoverWidget(QWidget *parent, PeerData *peer) : TWidget(parent)
 		notifyPeerUpdated(update);
 	}));
 
-	connect(App::app(), SIGNAL(peerPhotoDone(PeerId)), this, SLOT(onPhotoUploadStatusChanged(PeerId)));
-	connect(App::app(), SIGNAL(peerPhotoFail(PeerId)), this, SLOT(onPhotoUploadStatusChanged(PeerId)));
+	connect(&Messenger::Instance(), SIGNAL(peerPhotoDone(PeerId)), this, SLOT(onPhotoUploadStatusChanged(PeerId)));
+	connect(&Messenger::Instance(), SIGNAL(peerPhotoFail(PeerId)), this, SLOT(onPhotoUploadStatusChanged(PeerId)));
 
 	connect(_userpicButton, SIGNAL(clicked()), this, SLOT(onPhotoShow()));
 	validatePhoto();
@@ -97,7 +98,7 @@ PhotoData *CoverWidget::validatePhoto() const {
 	auto photo = (_peer->photoId && _peer->photoId != UnknownPeerPhotoId) ? App::photo(_peer->photoId) : nullptr;
 	_userpicButton->setPointerCursor(photo != nullptr && photo->date != 0);
 	if ((_peer->photoId == UnknownPeerPhotoId) || (_peer->photoId && (!photo || !photo->date))) {
-		App::api()->requestFullPeer(_peer);
+		Auth().api().requestFullPeer(_peer);
 		return nullptr;
 	}
 	return photo;
@@ -105,7 +106,7 @@ PhotoData *CoverWidget::validatePhoto() const {
 
 void CoverWidget::onPhotoShow() {
 	if (auto photo = validatePhoto()) {
-		App::wnd()->showPhoto(photo, _peer);
+		Messenger::Instance().showPhoto(photo, _peer);
 	}
 }
 
@@ -523,7 +524,7 @@ void CoverWidget::showSetPhotoBox(const QImage &img) {
 	}
 
 	auto box = Ui::show(Box<PhotoCropBox>(img, _peer));
-	connect(box, SIGNAL(closed()), this, SLOT(onPhotoUploadStatusChanged()));
+	subscribe(box->boxClosing, [this] { onPhotoUploadStatusChanged(); });
 }
 
 void CoverWidget::onPhotoUploadStatusChanged(PeerId peerId) {
@@ -537,27 +538,24 @@ void CoverWidget::onAddMember() {
 		if (_peerChat->count >= Global::ChatSizeMax() && _peerChat->amCreator()) {
 			Ui::show(Box<ConvertToSupergroupBox>(_peerChat));
 		} else {
-			Ui::show(Box<ContactsBox>(_peerChat, MembersFilter::Recent));
+			AddParticipantsBoxController::Start(_peerChat);
 		}
 	} else if (_peerChannel && _peerChannel->mgInfo) {
-		MembersAlreadyIn already;
-		for_const (auto user, _peerChannel->mgInfo->lastParticipants) {
-			already.insert(user);
-		}
-		Ui::show(Box<ContactsBox>(_peerChannel, MembersFilter::Recent, already));
+		auto &participants = _peerChannel->mgInfo->lastParticipants;
+		AddParticipantsBoxController::Start(_peerChannel, { participants.cbegin(), participants.cend() });
 	}
 }
 
 void CoverWidget::onAddBotToGroup() {
 	if (_peerUser && _peerUser->botInfo) {
-		Ui::show(Box<ContactsBox>(_peerUser));
+		AddBotToGroupBoxController::Start(_peerUser);
 	}
 }
 
 void CoverWidget::onJoin() {
 	if (!_peerChannel) return;
 
-	App::api()->joinChannel(_peerChannel);
+	Auth().api().joinChannel(_peerChannel);
 }
 
 void CoverWidget::onViewChannel() {

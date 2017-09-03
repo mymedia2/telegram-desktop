@@ -34,10 +34,10 @@ constexpr auto kDelayedHideTimeoutMs = 3000;
 
 } // namespace
 
-TabbedPanel::TabbedPanel(QWidget *parent, gsl::not_null<Window::Controller*> controller) : TabbedPanel(parent, controller, object_ptr<TabbedSelector>(nullptr, controller)) {
+TabbedPanel::TabbedPanel(QWidget *parent, not_null<Window::Controller*> controller) : TabbedPanel(parent, controller, object_ptr<TabbedSelector>(nullptr, controller)) {
 }
 
-TabbedPanel::TabbedPanel(QWidget *parent, gsl::not_null<Window::Controller*> controller, object_ptr<TabbedSelector> selector) : TWidget(parent)
+TabbedPanel::TabbedPanel(QWidget *parent, not_null<Window::Controller*> controller, object_ptr<TabbedSelector> selector) : TWidget(parent)
 , _controller(controller)
 , _selector(std::move(selector)) {
 	_selector->setParent(this);
@@ -143,7 +143,7 @@ void TabbedPanel::paintEvent(QPaintEvent *e) {
 	}
 
 	if (showAnimating) {
-		t_assert(_showAnimation != nullptr);
+		Assert(_showAnimation != nullptr);
 		if (auto opacity = _a_opacity.current(_hiding ? 0. : 1.)) {
 			_showAnimation->paintFrame(p, 0, 0, width(), _a_show.current(1.), opacity);
 		}

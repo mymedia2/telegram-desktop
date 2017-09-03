@@ -61,10 +61,10 @@ protected:
 	QPoint prepareRippleStartPosition() const override;
 
 private:
-	QPoint iconPosition(gsl::not_null<const style::CallButton*> st) const;
+	QPoint iconPosition(not_null<const style::CallButton*> st) const;
 	void mixIconMasks();
 
-	gsl::not_null<const style::CallButton*> _stFrom;
+	not_null<const style::CallButton*> _stFrom;
 	const style::CallButton *_stTo = nullptr;
 	float64 _progress = 0.;
 
@@ -85,10 +85,10 @@ Panel::Button::Button(QWidget *parent, const style::CallButton &stFrom, const st
 	_bgMask = prepareRippleMask();
 	_bgFrom = App::pixmapFromImageInPlace(style::colorizeImage(_bgMask, _stFrom->bg));
 	if (_stTo) {
-		t_assert(_stFrom->button.width == _stTo->button.width);
-		t_assert(_stFrom->button.height == _stTo->button.height);
-		t_assert(_stFrom->button.rippleAreaPosition == _stTo->button.rippleAreaPosition);
-		t_assert(_stFrom->button.rippleAreaSize == _stTo->button.rippleAreaSize);
+		Assert(_stFrom->button.width == _stTo->button.width);
+		Assert(_stFrom->button.height == _stTo->button.height);
+		Assert(_stFrom->button.rippleAreaPosition == _stTo->button.rippleAreaPosition);
+		Assert(_stFrom->button.rippleAreaSize == _stTo->button.rippleAreaSize);
 
 		_bg = QImage(_bgMask.size(), QImage::Format_ARGB32_Premultiplied);
 		_bg.setDevicePixelRatio(cRetinaFactor());
@@ -192,7 +192,7 @@ void Panel::Button::paintEvent(QPaintEvent *e) {
 	}
 }
 
-QPoint Panel::Button::iconPosition(gsl::not_null<const style::CallButton*> st) const {
+QPoint Panel::Button::iconPosition(not_null<const style::CallButton*> st) const {
 	auto result = st->button.iconPosition;
 	if (result.x() < 0) {
 		result.setX((width() - st->button.icon.width()) / 2);
@@ -240,7 +240,7 @@ QImage Panel::Button::prepareRippleMask() const {
 	return Ui::RippleAnimation::ellipseMask(QSize(_stFrom->button.rippleAreaSize, _stFrom->button.rippleAreaSize));
 }
 
-Panel::Panel(gsl::not_null<Call*> call)
+Panel::Panel(not_null<Call*> call)
 : _call(call)
 , _user(call->user())
 , _answerHangupRedial(this, st::callAnswer, &st::callHangup)
@@ -264,7 +264,7 @@ void Panel::showAndActivate() {
 	setFocus();
 }
 
-void Panel::replaceCall(gsl::not_null<Call*> call) {
+void Panel::replaceCall(not_null<Call*> call) {
 	_call = call;
 	_user = call->user();
 	reinitControls();
@@ -361,12 +361,12 @@ void Panel::initLayout() {
 	initGeometry();
 
 	processUserPhoto();
-	subscribe(AuthSession::Current().api().fullPeerUpdated(), [this](PeerData *peer) {
+	subscribe(Auth().api().fullPeerUpdated(), [this](PeerData *peer) {
 		if (peer == _user) {
 			processUserPhoto();
 		}
 	});
-	subscribe(AuthSession::CurrentDownloaderTaskFinished(), [this] {
+	subscribe(Auth().downloaderTaskFinished(), [this] {
 		refreshUserPhoto();
 	});
 	createDefaultCacheImage();
@@ -439,7 +439,7 @@ void Panel::processUserPhoto() {
 		photo->full->load(true);
 	} else {
 		if ((_user->photoId == UnknownPeerPhotoId) || (_user->photoId && (!photo || !photo->date))) {
-			App::api()->requestFullPeer(_user);
+			Auth().api().requestFullPeer(_user);
 		}
 	}
 	refreshUserPhoto();

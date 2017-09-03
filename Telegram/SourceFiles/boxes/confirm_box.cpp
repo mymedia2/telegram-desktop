@@ -120,6 +120,11 @@ void ConfirmBox::prepare() {
 	if (!_informative) {
 		addButton([this] { return _cancelText; }, [this] { _cancelled = true; closeBox(); });
 	}
+	subscribe(boxClosing, [this] {
+		if (!_confirmed && (!_strictCancel || _cancelled) && _cancelledCallback) {
+			_cancelledCallback();
+		}
+	});
 	textUpdated();
 }
 
@@ -129,12 +134,6 @@ void ConfirmBox::textUpdated() {
 	setDimensions(st::boxWidth, st::boxPadding.top() + _textHeight + st::boxPadding.bottom());
 
 	setMouseTracking(_text.hasLinks());
-}
-
-void ConfirmBox::closeHook() {
-	if (!_confirmed && (!_strictCancel || _cancelled) && _cancelledCallback) {
-		_cancelledCallback();
-	}
 }
 
 void ConfirmBox::confirmed() {
@@ -217,7 +216,7 @@ InformBox::InformBox(QWidget*, const QString &text, base::lambda<void()> closedC
 InformBox::InformBox(QWidget*, const QString &text, const QString &doneText, base::lambda<void()> closedCallback) : ConfirmBox(ConfirmBox::InformBoxTag(), text, doneText, std::move(closedCallback)) {
 }
 
-MaxInviteBox::MaxInviteBox(QWidget*, gsl::not_null<ChannelData*> channel) : BoxContent()
+MaxInviteBox::MaxInviteBox(QWidget*, not_null<ChannelData*> channel) : BoxContent()
 , _channel(channel)
 , _text(st::boxLabelStyle, lng_participant_invite_sorry(lt_count, Global::ChatSizeMax()), _confirmBoxTextOptions, st::boxWidth - st::boxPadding.left() - st::boxButtonPadding.right()) {
 }
@@ -246,7 +245,7 @@ void MaxInviteBox::mousePressEvent(QMouseEvent *e) {
 	mouseMoveEvent(e);
 	if (_linkOver) {
 		if (_channel->inviteLink().isEmpty()) {
-			App::api()->exportInviteLink(_channel);
+			Auth().api().exportInviteLink(_channel);
 		} else {
 			QGuiApplication::clipboard()->setText(_channel->inviteLink());
 			Ui::Toast::Show(lang(lng_create_channel_link_copied));
@@ -329,7 +328,7 @@ void ConvertToSupergroupBox::convertDone(const MTPUpdates &updates) {
 			if (mtpChat.type() == mtpc_channel) {
 				auto channel = App::channel(mtpChat.c_channel().vid.v);
 				Ui::showPeerHistory(channel, ShowAtUnreadMsgId);
-				App::api()->requestParticipantsCountDelayed(channel);
+				Auth().api().requestParticipantsCountDelayed(channel);
 			}
 		}
 	};
@@ -431,7 +430,7 @@ DeleteMessagesBox::DeleteMessagesBox(QWidget*, HistoryItem *item, bool suggestMo
 
 DeleteMessagesBox::DeleteMessagesBox(QWidget*, const SelectedItemSet &selected) {
 	auto count = selected.size();
-	t_assert(count > 0);
+	Assert(count > 0);
 	_ids.reserve(count);
 	for_const (auto item, selected) {
 		_ids.push_back(item->fullId());
@@ -441,7 +440,7 @@ DeleteMessagesBox::DeleteMessagesBox(QWidget*, const SelectedItemSet &selected) 
 void DeleteMessagesBox::prepare() {
 	auto text = QString();
 	if (_moderateFrom) {
-		t_assert(_moderateInChannel != nullptr);
+		Assert(_moderateInChannel != nullptr);
 		text = lang(lng_selected_delete_sure_this);
 		if (_moderateBan) {
 			_banUser.create(this, lang(lng_ban_user), false, st::defaultBoxCheckbox);
@@ -543,7 +542,7 @@ void DeleteMessagesBox::deleteAndClear() {
 
 	if (_moderateFrom) {
 		if (_banUser && _banUser->checked()) {
-			App::api()->kickParticipant(_moderateInChannel, _moderateFrom, MTP_channelBannedRights(MTP_flags(0), MTP_int(0)));
+			Auth().api().kickParticipant(_moderateInChannel, _moderateFrom, MTP_channelBannedRights(MTP_flags(0), MTP_int(0)));
 		}
 		if (_reportSpam->checked()) {
 			MTP::send(MTPchannels_ReportSpam(_moderateInChannel->inputChannel, _moderateFrom->inputUser, MTP_vector<MTPint>(1, MTP_int(_ids[0].msg))));
@@ -602,7 +601,7 @@ ConfirmInviteBox::ConfirmInviteBox(QWidget*, const QString &title, bool isChanne
 		if (!location.isNull()) {
 			_photo = ImagePtr(location);
 			if (!_photo->loaded()) {
-				subscribe(AuthSession::CurrentDownloaderTaskFinished(), [this] { update(); });
+				subscribe(Auth().downloaderTaskFinished(), [this] { update(); });
 				_photo->load();
 			}
 		}

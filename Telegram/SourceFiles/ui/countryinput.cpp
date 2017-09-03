@@ -25,7 +25,6 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "ui/widgets/scroll_area.h"
 #include "ui/widgets/multi_select.h"
 #include "ui/effects/ripple_animation.h"
-#include "boxes/contacts_box.h"
 #include "countries.h"
 #include "styles/style_boxes.h"
 #include "styles/style_intro.h"
@@ -392,7 +391,7 @@ void CountrySelectBox::Inner::mousePressEvent(QMouseEvent *e) {
 		if (_ripples.size() <= _pressed) {
 			_ripples.reserve(_pressed + 1);
 			while (_ripples.size() <= _pressed) {
-				_ripples.push_back(std::unique_ptr<Ui::RippleAnimation>());
+				_ripples.push_back(nullptr);
 			}
 		}
 		if (!_ripples[_pressed]) {

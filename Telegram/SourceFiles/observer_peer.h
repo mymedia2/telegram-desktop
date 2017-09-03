@@ -21,6 +21,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #pragma once
 
 #include "base/observer.h"
+#include "base/flags.h"
 
 namespace Notify {
 
@@ -33,7 +34,7 @@ struct PeerUpdate {
 	}
 	PeerData *peer;
 
-	enum class Flag {
+	enum class Flag : uint32 {
 		None                      = 0x00000000U,
 
 		// Common flags
@@ -45,12 +46,14 @@ struct PeerUpdate {
 		SharedMediaChanged        = 0x00000020U,
 		MigrationChanged          = 0x00000040U,
 		PinnedChanged             = 0x00000080U,
+		RestrictionReasonChanged  = 0x00000100U,
 
 		// For chats and channels
-		InviteLinkChanged         = 0x00000100U,
-		MembersChanged            = 0x00000200U,
-		AdminsChanged             = 0x00000400U,
-		BannedUsersChanged       = 0x00000800U,
+		InviteLinkChanged         = 0x00000200U,
+		MembersChanged            = 0x00000400U,
+		AdminsChanged             = 0x00000800U,
+		BannedUsersChanged        = 0x00001000U,
+		UnreadMentionsChanged     = 0x00002000U,
 
 		// For users
 		UserCanShareContact       = 0x00010000U,
@@ -69,8 +72,12 @@ struct PeerUpdate {
 		// For channels
 		ChannelAmIn               = 0x00010000U,
 		ChannelRightsChanged      = 0x00020000U,
+		ChannelStickersChanged    = 0x00040000U,
+		ChannelPinnedChanged      = 0x00080000U,
 	};
-	Q_DECLARE_FLAGS(Flags, Flag);
+	using Flags = base::flags<Flag>;
+	friend inline constexpr auto is_flag_type(Flag) { return true; }
+
 	Flags flags = 0;
 
 	// NameChanged data
@@ -81,7 +88,6 @@ struct PeerUpdate {
 	int32 mediaTypesMask = 0;
 
 };
-Q_DECLARE_OPERATORS_FOR_FLAGS(PeerUpdate::Flags);
 
 void peerUpdatedDelayed(const PeerUpdate &update);
 inline void peerUpdatedDelayed(PeerData *peer, PeerUpdate::Flags events) {

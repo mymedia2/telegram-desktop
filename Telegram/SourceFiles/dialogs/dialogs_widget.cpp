@@ -37,6 +37,14 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "window/window_controller.h"
 #include "profile/profile_channel_controllers.h"
 
+namespace {
+
+QString SwitchToChooseFromQuery() {
+	return qsl("from:");
+}
+
+} // namespace
+
 class DialogsWidget::UpdateButton : public Ui::RippleButton {
 public:
 	UpdateButton(QWidget *parent);
@@ -83,7 +91,7 @@ void DialogsWidget::UpdateButton::paintEvent(QPaintEvent *e) {
 	}
 }
 
-DialogsWidget::DialogsWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller) : Window::AbstractSectionWidget(parent, controller)
+DialogsWidget::DialogsWidget(QWidget *parent, not_null<Window::Controller*> controller) : Window::AbstractSectionWidget(parent, controller)
 , _mainMenuToggle(this, st::dialogsMenuToggle)
 , _filter(this, st::dialogsFilter, langFactory(lng_dlg_filter))
 , _chooseFromUser(this, object_ptr<Ui::IconButton>(this, st::dialogsSearchFrom))
@@ -330,8 +338,8 @@ void DialogsWidget::dialogsReceived(const MTPmessages_Dialogs &dialogs, mtpReque
 	} break;
 	}
 
-	if (!AuthSession::Current().data().contactsLoaded().value() && !_contactsRequestId) {
-		_contactsRequestId = MTP::send(MTPcontacts_GetContacts(MTP_string("")), rpcDone(&DialogsWidget::contactsReceived), rpcFail(&DialogsWidget::contactsFailed));
+	if (!Auth().data().contactsLoaded().value() && !_contactsRequestId) {
+		_contactsRequestId = MTP::send(MTPcontacts_GetContacts(MTP_int(0)), rpcDone(&DialogsWidget::contactsReceived), rpcFail(&DialogsWidget::contactsFailed));
 	}
 
 	if (dialogsList) {
@@ -374,7 +382,7 @@ void DialogsWidget::dialogsReceived(const MTPmessages_Dialogs &dialogs, mtpReque
 			_dialogsFull = true;
 		}
 
-		t_assert(messagesList != nullptr);
+		Assert(messagesList != nullptr);
 		App::feedMsgs(*messagesList, NewMessageLast);
 
 		unreadCountsReceived(*dialogsList);
@@ -387,9 +395,9 @@ void DialogsWidget::dialogsReceived(const MTPmessages_Dialogs &dialogs, mtpReque
 	_dialogsRequestId = 0;
 	loadDialogs();
 
-	AuthSession::Current().data().moreChatsLoaded().notify();
+	Auth().data().moreChatsLoaded().notify();
 	if (_dialogsFull) {
-		AuthSession::Current().data().allChatsLoaded().set(true);
+		Auth().data().allChatsLoaded().set(true);
 	}
 }
 
@@ -424,7 +432,7 @@ void DialogsWidget::pinnedDialogsReceived(const MTPmessages_PeerDialogs &dialogs
 	_pinnedDialogsRequestId = 0;
 	_pinnedDialogsReceived = true;
 
-	AuthSession::Current().data().moreChatsLoaded().notify();
+	Auth().data().moreChatsLoaded().notify();
 }
 
 bool DialogsWidget::dialogsFailed(const RPCError &error, mtpRequestId requestId) {
@@ -482,7 +490,7 @@ bool DialogsWidget::onSearchMessages(bool searchCache) {
 		MTP::cancel(base::take(_searchRequest));
 		if (_searchInPeer) {
 			auto flags = _searchQueryFrom ? MTP_flags(MTPmessages_Search::Flag::f_from_id) : MTP_flags(0);
-			_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInPeer->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(SearchPerPage)), rpcDone(&DialogsWidget::searchReceived, DialogsSearchPeerFromStart), rpcFail(&DialogsWidget::searchFailed, DialogsSearchPeerFromStart));
+			_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInPeer->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(SearchPerPage), MTP_int(0), MTP_int(0)), rpcDone(&DialogsWidget::searchReceived, DialogsSearchPeerFromStart), rpcFail(&DialogsWidget::searchFailed, DialogsSearchPeerFromStart));
 		} else {
 			_searchRequest = MTP::send(MTPmessages_SearchGlobal(MTP_string(_searchQuery), MTP_int(0), MTP_inputPeerEmpty(), MTP_int(0), MTP_int(SearchPerPage)), rpcDone(&DialogsWidget::searchReceived, DialogsSearchFromStart), rpcFail(&DialogsWidget::searchFailed, DialogsSearchFromStart));
 		}
@@ -545,7 +553,7 @@ void DialogsWidget::onSearchMore() {
 			auto offsetId = _inner->lastSearchId();
 			if (_searchInPeer) {
 				auto flags = _searchQueryFrom ? MTP_flags(MTPmessages_Search::Flag::f_from_id) : MTP_flags(0);
-				_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInPeer->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(offsetId), MTP_int(SearchPerPage)), rpcDone(&DialogsWidget::searchReceived, offsetId ? DialogsSearchPeerFromOffset : DialogsSearchPeerFromStart), rpcFail(&DialogsWidget::searchFailed, offsetId ? DialogsSearchPeerFromOffset : DialogsSearchPeerFromStart));
+				_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInPeer->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(offsetId), MTP_int(0), MTP_int(SearchPerPage), MTP_int(0), MTP_int(0)), rpcDone(&DialogsWidget::searchReceived, offsetId ? DialogsSearchPeerFromOffset : DialogsSearchPeerFromStart), rpcFail(&DialogsWidget::searchFailed, offsetId ? DialogsSearchPeerFromOffset : DialogsSearchPeerFromStart));
 			} else {
 				_searchRequest = MTP::send(MTPmessages_SearchGlobal(MTP_string(_searchQuery), MTP_int(offsetDate), offsetPeer ? offsetPeer->input : MTP_inputPeerEmpty(), MTP_int(offsetId), MTP_int(SearchPerPage)), rpcDone(&DialogsWidget::searchReceived, offsetId ? DialogsSearchFromOffset : DialogsSearchFromStart), rpcFail(&DialogsWidget::searchFailed, offsetId ? DialogsSearchFromOffset : DialogsSearchFromStart));
 			}
@@ -555,7 +563,7 @@ void DialogsWidget::onSearchMore() {
 		} else if (_searchInMigrated && !_searchFullMigrated) {
 			auto offsetMigratedId = _inner->lastSearchMigratedId();
 			auto flags = _searchQueryFrom ? MTP_flags(MTPmessages_Search::Flag::f_from_id) : MTP_flags(0);
-			_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInMigrated->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(0), MTP_int(offsetMigratedId), MTP_int(SearchPerPage)), rpcDone(&DialogsWidget::searchReceived, offsetMigratedId ? DialogsSearchMigratedFromOffset : DialogsSearchMigratedFromStart), rpcFail(&DialogsWidget::searchFailed, offsetMigratedId ? DialogsSearchMigratedFromOffset : DialogsSearchMigratedFromStart));
+			_searchRequest = MTP::send(MTPmessages_Search(flags, _searchInMigrated->input, MTP_string(_searchQuery), _searchQueryFrom ? _searchQueryFrom->inputUser : MTP_inputUserEmpty(), MTP_inputMessagesFilterEmpty(), MTP_int(0), MTP_int(0), MTP_int(offsetMigratedId), MTP_int(0), MTP_int(SearchPerPage), MTP_int(0), MTP_int(0)), rpcDone(&DialogsWidget::searchReceived, offsetMigratedId ? DialogsSearchMigratedFromOffset : DialogsSearchMigratedFromStart), rpcFail(&DialogsWidget::searchFailed, offsetMigratedId ? DialogsSearchMigratedFromOffset : DialogsSearchMigratedFromStart));
 		}
 	}
 }
@@ -590,7 +598,7 @@ void DialogsWidget::contactsReceived(const MTPcontacts_Contacts &result) {
 		App::feedUsers(d.vusers);
 		_inner->contactsReceived(d.vcontacts.v);
 	}
-	AuthSession::Current().data().contactsLoaded().set(true);
+	Auth().data().contactsLoaded().set(true);
 }
 
 bool DialogsWidget::contactsFailed(const RPCError &error) {
@@ -809,6 +817,16 @@ void DialogsWidget::onFilterUpdate(bool force) {
 		_peerSearchQueries.clear();
 		_peerSearchQuery = QString();
 	}
+
+	if (!_chooseFromUser->isHiddenOrHiding() || _searchFromUser) {
+		auto switchToChooseFrom = SwitchToChooseFromQuery();
+		if (_lastFilterText != switchToChooseFrom
+			&& switchToChooseFrom.startsWith(_lastFilterText)
+			&& filterText == switchToChooseFrom) {
+			showSearchFrom();
+		}
+	}
+	_lastFilterText = filterText;
 }
 
 void DialogsWidget::searchInPeer(PeerData *peer) {
@@ -836,6 +854,10 @@ void DialogsWidget::setSearchInPeer(PeerData *peer, UserData *from) {
 		clearSearchCache();
 	}
 	_inner->searchInPeer(_searchInPeer, _searchFromUser);
+	if (_searchFromUser && _lastFilterText == SwitchToChooseFromQuery()) {
+		onCancelSearch();
+	}
+	_filter->setFocus();
 }
 
 void DialogsWidget::clearSearchCache() {
@@ -848,11 +870,11 @@ void DialogsWidget::clearSearchCache() {
 
 void DialogsWidget::showSearchFrom() {
 	auto peer = _searchInPeer;
-	Dialogs::ShowSearchFromBox(peer, base::lambda_guarded(this, [this, peer](gsl::not_null<UserData*> user) {
+	Dialogs::ShowSearchFromBox(peer, base::lambda_guarded(this, [this, peer](not_null<UserData*> user) {
 		Ui::hideLayer();
 		setSearchInPeer(peer, user);
 		onFilterUpdate(true);
-	}));
+	}), base::lambda_guarded(this, [this] { _filter->setFocus(); }));
 }
 
 void DialogsWidget::onFilterCursorMoved(int from, int to) {
@@ -921,11 +943,19 @@ void DialogsWidget::updateJumpToDateVisibility(bool fast) {
 }
 
 void DialogsWidget::updateSearchFromVisibility(bool fast) {
-	auto searchFromUserVisible = _searchInPeer && (_searchInPeer->isChat() || _searchInPeer->isMegagroup()) && !_searchFromUser;
+	auto visible = _searchInPeer && (_searchInPeer->isChat() || _searchInPeer->isMegagroup()) && !_searchFromUser;
+	auto changed = (visible == _chooseFromUser->isHiddenOrHiding());
 	if (fast) {
-		_chooseFromUser->toggleFast(searchFromUserVisible);
+		_chooseFromUser->toggleFast(visible);
 	} else {
-		_chooseFromUser->toggleAnimated(searchFromUserVisible);
+		_chooseFromUser->toggleAnimated(visible);
+	}
+	if (changed) {
+		auto margins = st::dialogsFilter.textMrg;
+		if (visible) {
+			margins.setRight(margins.right() + _chooseFromUser->width());
+		}
+		_filter->setTextMrg(margins);
 	}
 }
 

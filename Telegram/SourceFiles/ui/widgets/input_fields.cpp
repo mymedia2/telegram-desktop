@@ -81,9 +81,7 @@ QByteArray FlatTextarea::serializeTagsList(const TagList &tags) {
 
 	QByteArray tagsSerialized;
 	{
-		QBuffer buffer(&tagsSerialized);
-		buffer.open(QIODevice::WriteOnly);
-		QDataStream stream(&buffer);
+		QDataStream stream(&tagsSerialized, QIODevice::WriteOnly);
 		stream.setVersion(QDataStream::Qt_5_1);
 		stream << qint32(tags.size());
 		for_const (auto &tag, tags) {
@@ -99,10 +97,7 @@ FlatTextarea::TagList FlatTextarea::deserializeTagsList(QByteArray data, int tex
 		return result;
 	}
 
-	QBuffer buffer(&data);
-	buffer.open(QIODevice::ReadOnly);
-
-	QDataStream stream(&buffer);
+	QDataStream stream(data);
 	stream.setVersion(QDataStream::Qt_5_1);
 
 	qint32 tagCount = 0;
@@ -409,8 +404,8 @@ EmojiPtr FlatTextarea::getSingleEmoji() const {
 }
 
 QString FlatTextarea::getInlineBotQuery(UserData **outInlineBot, QString *outInlineBotUsername) const {
-	t_assert(outInlineBot != nullptr);
-	t_assert(outInlineBotUsername != nullptr);
+	Assert(outInlineBot != nullptr);
+	Assert(outInlineBotUsername != nullptr);
 
 	auto &text = getTextWithTags().text;
 	auto textLength = text.size();
@@ -530,7 +525,7 @@ void FlatTextarea::insertTag(const QString &text, QString tagId) {
 	auto block = doc->findBlock(pos);
 	for (auto iter = block.begin(); !iter.atEnd(); ++iter) {
 		auto fragment = iter.fragment();
-		t_assert(fragment.isValid());
+		Assert(fragment.isValid());
 
 		int fragmentPosition = fragment.position();
 		int fragmentEnd = (fragmentPosition + fragment.length());
@@ -662,7 +657,7 @@ public:
 
 		if (!_currentTagId.isEmpty()) {
 			int randomPartPosition = _currentTagId.lastIndexOf('/');
-			t_assert(randomPartPosition > 0);
+			Assert(randomPartPosition > 0);
 
 			bool tagChanged = true;
 			if (_currentTag < _tags->size()) {
@@ -1105,7 +1100,7 @@ void FlatTextarea::processFormatting(int insertPosition, int insertEnd) {
 		for (auto block = fromBlock; block != tillBlock; block = block.next()) {
 			for (auto fragmentIt = block.begin(); !fragmentIt.atEnd(); ++fragmentIt) {
 				auto fragment = fragmentIt.fragment();
-				t_assert(fragment.isValid());
+				Assert(fragment.isValid());
 
 				int fragmentPosition = fragment.position();
 				if (insertPosition >= fragmentPosition + fragment.length()) {
@@ -1470,7 +1465,8 @@ FlatInput::FlatInput(QWidget *parent, const style::FlatInput &st, base::lambda<Q
 , _oldtext(v)
 , _placeholderFactory(std::move(placeholderFactory))
 , _placeholderVisible(!v.length())
-, _st(st) {
+, _st(st)
+, _textMrg(_st.textMrg) {
 	setCursor(style::cur_text);
 	resize(_st.width, _st.height);
 
@@ -1564,8 +1560,14 @@ void FlatInput::touchEvent(QTouchEvent *e) {
 	}
 }
 
+void FlatInput::setTextMrg(const QMargins &textMrg) {
+	_textMrg = textMrg;
+	refreshPlaceholder();
+	update();
+}
+
 QRect FlatInput::getTextRect() const {
-	return rect().marginsRemoved(_st.textMrg + QMargins(-2, -1, -2, -1));
+	return rect().marginsRemoved(_textMrg + QMargins(-2, -1, -2, -1));
 }
 
 void FlatInput::paintEvent(QPaintEvent *e) {
@@ -1635,7 +1637,7 @@ void FlatInput::setPlaceholder(base::lambda<QString()> placeholderFactory) {
 }
 
 void FlatInput::refreshPlaceholder() {
-	auto availw = width() - _st.textMrg.left() - _st.textMrg.right() - _st.phPos.x() - 1;
+	auto availw = width() - _textMrg.left() - _textMrg.right() - _st.phPos.x() - 1;
 	auto placeholderText = _placeholderFactory ? _placeholderFactory() : QString();
 	if (_st.font->width(placeholderText) > availw) {
 		_placeholder = _st.font->elided(placeholderText, availw);
@@ -1683,7 +1685,7 @@ void FlatInput::inputMethodEvent(QInputMethodEvent *e) {
 }
 
 QRect FlatInput::placeholderRect() const {
-	return QRect(_st.textMrg.left() + _st.phPos.x(), _st.textMrg.top() + _st.phPos.y(), width() - _st.textMrg.left() - _st.textMrg.right(), height() - _st.textMrg.top() - _st.textMrg.bottom());
+	return QRect(_textMrg.left() + _st.phPos.x(), _textMrg.top() + _st.phPos.y(), width() - _textMrg.left() - _textMrg.right(), height() - _textMrg.top() - _textMrg.bottom());
 }
 
 void FlatInput::correctValue(const QString &was, QString &now) {
@@ -3428,7 +3430,7 @@ void MaskedInputField::paintEvent(QPaintEvent *e) {
 
 		auto placeholderTop = anim::interpolate(0, _st.placeholderShift, placeholderShiftDegree);
 
-		QRect r(rect().marginsRemoved(_st.textMargins + _st.placeholderMargins));
+		QRect r(rect().marginsRemoved(_textMargins + _st.placeholderMargins));
 		r.moveTop(r.top() + placeholderTop);
 		if (rtl()) r.moveLeft(width() - r.left() - r.width());
 
@@ -3453,7 +3455,7 @@ void MaskedInputField::paintEvent(QPaintEvent *e) {
 
 			auto placeholderLeft = anim::interpolate(0, -_st.placeholderShift, placeholderHiddenDegree);
 
-			QRect r(rect().marginsRemoved(_st.textMargins + _st.placeholderMargins));
+			QRect r(rect().marginsRemoved(_textMargins + _st.placeholderMargins));
 			r.moveLeft(r.left() + placeholderLeft);
 			if (rtl()) r.moveLeft(width() - r.left() - r.width());
 
@@ -3462,6 +3464,7 @@ void MaskedInputField::paintEvent(QPaintEvent *e) {
 			p.drawText(r, _placeholder, _st.placeholderAlign);
 
 			p.restore();
+			p.setOpacity(1.);
 		}
 	}
 
@@ -3518,7 +3521,7 @@ void MaskedInputField::resizeEvent(QResizeEvent *e) {
 
 void MaskedInputField::refreshPlaceholder() {
 	auto placeholderText = _placeholderFactory ? _placeholderFactory() : QString();
-	auto availableWidth = width() - _st.textMargins.left() - _st.textMargins.right() - _st.placeholderMargins.left() - _st.placeholderMargins.right() - 1;
+	auto availableWidth = width() - _textMargins.left() - _textMargins.right() - _st.placeholderMargins.left() - _st.placeholderMargins.right() - 1;
 	if (_st.placeholderScale > 0.) {
 		auto placeholderFont = _st.placeholderFont->f;
 		placeholderFont.setStyleStrategy(QFont::PreferMatch);
@@ -3602,7 +3605,7 @@ void MaskedInputField::startPlaceholderAnimation() {
 }
 
 QRect MaskedInputField::placeholderRect() const {
-	return rect().marginsRemoved(_st.textMargins + _st.placeholderMargins);
+	return rect().marginsRemoved(_textMargins + _st.placeholderMargins);
 }
 
 void MaskedInputField::placeholderAdditionalPrepare(Painter &p, TimeMs ms) {
@@ -3886,8 +3889,12 @@ void PortInput::correctValue(const QString &was, int32 wasCursor, QString &now, 
 	setCorrectedText(now, nowCursor, newText, newPos);
 }
 
-UsernameInput::UsernameInput(QWidget *parent, const style::InputField &st, base::lambda<QString()> placeholderFactory, const QString &val, bool isLink) : MaskedInputField(parent, st, std::move(placeholderFactory), val)
-, _linkPlaceholder(isLink ? Messenger::Instance().createInternalLink(QString()) : QString()) {
+UsernameInput::UsernameInput(QWidget *parent, const style::InputField &st, base::lambda<QString()> placeholderFactory, const QString &val, bool isLink) : MaskedInputField(parent, st, std::move(placeholderFactory), val) {
+	setLinkPlaceholder(isLink ? Messenger::Instance().createInternalLink(QString()) : QString());
+}
+
+void UsernameInput::setLinkPlaceholder(const QString &placeholder) {
+	_linkPlaceholder = placeholder;
 	if (!_linkPlaceholder.isEmpty()) {
 		setTextMargins(style::margins(_st.textMargins.left() + _st.font->width(_linkPlaceholder), _st.textMargins.top(), _st.textMargins.right(), _st.textMargins.bottom()));
 		setPlaceholderHidden(true);

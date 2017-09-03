@@ -23,6 +23,8 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "base/timer.h"
 #include "core/single_timer.h"
 #include "mtproto/sender.h"
+#include "base/flat_map.h"
+#include "base/flat_set.h"
 
 class AuthSession;
 
@@ -40,7 +42,7 @@ inline const MTPVector<MTPChat> *getChatsFromMessagesChats(const MTPmessages_Cha
 
 class ApiWrap : private MTP::Sender, private base::Subscriber {
 public:
-	ApiWrap(gsl::not_null<AuthSession*> session);
+	ApiWrap(not_null<AuthSession*> session);
 
 	void start();
 	void applyUpdates(const MTPUpdates &updates, uint64 sentMessageRandomId = 0);
@@ -69,6 +71,8 @@ public:
 	void scheduleStickerSetRequest(uint64 setId, uint64 access);
 	void requestStickerSets();
 	void saveStickerSets(const Stickers::Order &localOrder, const Stickers::Order &localRemoved);
+	void updateStickers();
+	void setGroupStickerSet(not_null<ChannelData*> megagroup, const MTPInputStickerSet &set);
 
 	void joinChannel(ChannelData *channel);
 	void leaveChannel(ChannelData *channel);
@@ -94,7 +98,15 @@ public:
 	void applyUpdatesNoPtsCheck(const MTPUpdates &updates);
 	void applyUpdateNoPtsCheck(const MTPUpdate &update);
 
-	void jumpToDate(gsl::not_null<PeerData*> peer, const QDate &date);
+	void jumpToDate(not_null<PeerData*> peer, const QDate &date);
+
+	void preloadEnoughUnreadMentions(not_null<History*> history);
+	void checkForUnreadMentions(const base::flat_set<MsgId> &possiblyReadMentions, ChannelData *channel = nullptr);
+
+	void editChatAdmins(
+		not_null<ChatData*> chat,
+		bool adminsEnabled,
+		base::flat_set<not_null<UserData*>> &&admins);
 
 	~ApiWrap();
 
@@ -131,7 +143,17 @@ private:
 	void stickerSetDisenabled(mtpRequestId requestId);
 	void stickersSaveOrder();
 
-	gsl::not_null<AuthSession*> _session;
+	void requestStickers(TimeId now);
+	void requestRecentStickers(TimeId now);
+	void requestFavedStickers(TimeId now);
+	void requestFeaturedStickers(TimeId now);
+	void requestSavedGifs(TimeId now);
+
+	void cancelEditChatAdmins(not_null<ChatData*> chat);
+	void saveChatAdmins(not_null<ChatData*> chat);
+	void sendSaveChatAdminsRequests(not_null<ChatData*> chat);
+
+	not_null<AuthSession*> _session;
 	mtpRequestId _changelogSubscription = 0;
 
 	MessageDataRequests _messageDataRequests;
@@ -171,9 +193,21 @@ private:
 	mtpRequestId _stickersReorderRequestId = 0;
 	mtpRequestId _stickersClearRecentRequestId = 0;
 
+	mtpRequestId _stickersUpdateRequest = 0;
+	mtpRequestId _recentStickersUpdateRequest = 0;
+	mtpRequestId _favedStickersUpdateRequest = 0;
+	mtpRequestId _featuredStickersUpdateRequest = 0;
+	mtpRequestId _savedGifsUpdateRequest = 0;
+
 	QMap<mtpTypeId, mtpRequestId> _privacySaveRequests;
 
 	mtpRequestId _contactsStatusesRequestId = 0;
+
+	base::flat_map<not_null<History*>, mtpRequestId> _unreadMentionsRequests;
+
+	base::flat_map<not_null<ChatData*>, mtpRequestId> _chatAdminsEnabledRequests;
+	base::flat_map<not_null<ChatData*>, base::flat_set<not_null<UserData*>>> _chatAdminsToSave;
+	base::flat_map<not_null<ChatData*>, base::flat_set<mtpRequestId>> _chatAdminsSaveRequests;
 
 	base::Observable<PeerData*> _fullPeerUpdated;
 

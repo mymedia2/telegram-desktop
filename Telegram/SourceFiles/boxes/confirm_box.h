@@ -47,8 +47,6 @@ public:
 	void clickHandlerActiveChanged(const ClickHandlerPtr &p, bool active) override;
 	void clickHandlerPressedChanged(const ClickHandlerPtr &p, bool pressed) override;
 
-	void closeHook() override;
-
 protected:
 	void prepare() override;
 
@@ -100,7 +98,7 @@ public:
 
 class MaxInviteBox : public BoxContent {
 public:
-	MaxInviteBox(QWidget*, gsl::not_null<ChannelData*> channel);
+	MaxInviteBox(QWidget*, not_null<ChannelData*> channel);
 
 protected:
 	void prepare() override;
@@ -114,7 +112,7 @@ protected:
 private:
 	void updateSelected(const QPoint &cursorGlobalPosition);
 
-	gsl::not_null<ChannelData*> _channel;
+	not_null<ChannelData*> _channel;
 
 	Text _text;
 	int32 _textWidth, _textHeight;

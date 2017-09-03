@@ -153,7 +153,7 @@ class MainWidget : public TWidget, public RPCSender, private base::Subscriber {
 	Q_OBJECT
 
 public:
-	MainWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller);
+	MainWidget(QWidget *parent, not_null<Window::Controller*> controller);
 
 	bool isSectionShown() const;
 
@@ -175,7 +175,7 @@ public:
 	bool started();
 	void applyNotifySetting(const MTPNotifyPeer &peer, const MTPPeerNotifySettings &settings, History *history = 0);
 
-	void updateNotifySetting(PeerData *peer, NotifySettingStatus notify, SilentNotifiesStatus silent = SilentNotifiesDontChange);
+	void updateNotifySetting(PeerData *peer, NotifySettingStatus notify, SilentNotifiesStatus silent = SilentNotifiesDontChange, int muteFor = 86400 * 365);
 
 	void incrementSticker(DocumentData *sticker);
 
@@ -227,6 +227,7 @@ public:
 
 	bool isActive() const;
 	bool doWeReadServerHistory() const;
+	bool doWeReadMentions() const;
 	bool lastWasOnline() const;
 	TimeMs lastSetOnline() const;
 
@@ -270,7 +271,7 @@ public:
 	void clearHistory(PeerData *peer);
 	void deleteAllFromUser(ChannelData *channel, UserData *from);
 
-	void addParticipants(PeerData *chatOrChannel, const std::vector<gsl::not_null<UserData*>> &users);
+	void addParticipants(PeerData *chatOrChannel, const std::vector<not_null<UserData*>> &users);
 	struct UserAndPeer {
 		UserData *user;
 		PeerData *peer;
@@ -308,17 +309,15 @@ public:
     void readServerHistory(History *history, ReadServerHistoryChecks checks = ReadServerHistoryChecks::OnlyIfUnread);
 	void unreadCountChanged(History *history);
 
-	TimeMs animActiveTimeStart(const HistoryItem *msg) const;
-	void stopAnimActive();
+	TimeMs highlightStartTime(not_null<const HistoryItem*> item) const;
 
 	void sendBotCommand(PeerData *peer, UserData *bot, const QString &cmd, MsgId replyTo);
 	void hideSingleUseKeyboard(PeerData *peer, MsgId replyTo);
 	bool insertBotCommand(const QString &cmd);
 
-	void jumpToDate(gsl::not_null<PeerData*> peer, const QDate &date);
+	void jumpToDate(not_null<PeerData*> peer, const QDate &date);
 	void searchMessages(const QString &query, PeerData *inPeer);
 	bool preloadOverview(PeerData *peer, MediaOverviewType type);
-	void changingMsgId(HistoryItem *row, MsgId newId);
 	void itemEdited(HistoryItem *item);
 
 	void loadMediaBack(PeerData *peer, MediaOverviewType type, bool many = false);
@@ -348,14 +347,13 @@ public:
 	void cancelForwarding(History *history);
 	void finishForwarding(History *history, bool silent); // send them
 
-	void mediaMarkRead(DocumentData *data);
+	void mediaMarkRead(not_null<DocumentData*> data);
 	void mediaMarkRead(const HistoryItemsMap &items);
+	void mediaMarkRead(not_null<HistoryItem*> item);
 
 	void webPageUpdated(WebPageData *page);
 	void gameUpdated(GameData *game);
 	void updateMutedIn(int32 seconds);
-
-	void updateStickers();
 
 	void choosePeer(PeerId peerId, MsgId showAtMsgId); // does offerPeer or showPeerHistory
 	void clearBotStartToken(PeerData *peer);
@@ -386,7 +384,7 @@ public:
 
 	void app_sendBotCallback(const HistoryMessageReplyMarkup::Button *button, const HistoryItem *msg, int row, int col);
 
-	void ui_repaintHistoryItem(gsl::not_null<const HistoryItem*> item);
+	void ui_repaintHistoryItem(not_null<const HistoryItem*> item);
 	void ui_showPeerHistory(quint64 peer, qint32 msgId, Ui::ShowWay way);
 	PeerData *ui_getPeerForMouseAction();
 
@@ -408,12 +406,8 @@ public:
 	~MainWidget();
 
 signals:
-	void peerUpdated(PeerData *peer);
-	void peerNameChanged(PeerData *peer, const PeerData::Names &oldNames, const PeerData::NameFirstChars &oldChars);
-	void peerPhotoChanged(PeerData *peer);
 	void dialogRowReplaced(Dialogs::Row *oldRow, Dialogs::Row *newRow);
 	void dialogsUpdated();
-	void stickersUpdated();
 
 public slots:
 	void webPagesOrGamesUpdate();
@@ -521,7 +515,7 @@ private:
 	void readRequestDone(PeerData *peer);
 
 	void messagesAffected(PeerData *peer, const MTPmessages_AffectedMessages &result);
-	void overviewLoaded(History *history, const MTPmessages_Messages &result, mtpRequestId req);
+	void overviewLoaded(not_null<History*> history, const MTPmessages_Messages &result, mtpRequestId req);
 	void mediaOverviewUpdated(const Notify::PeerUpdate &update);
 
 	Window::SectionSlideParams prepareShowAnimation(bool willHaveTopBarShadow, bool willHaveTabbedSection);
@@ -574,17 +568,17 @@ private:
 
 	void clearCachedBackground();
 	void checkCurrentFloatPlayer();
-	void toggleFloatPlayer(gsl::not_null<Float*> instance);
+	void toggleFloatPlayer(not_null<Float*> instance);
 	void checkFloatPlayerVisibility();
-	void updateFloatPlayerPosition(gsl::not_null<Float*> instance);
-	void removeFloatPlayer(gsl::not_null<Float*> instance);
+	void updateFloatPlayerPosition(not_null<Float*> instance);
+	void removeFloatPlayer(not_null<Float*> instance);
 	Float *currentFloatPlayer() const {
 		return _playerFloats.empty() ? nullptr : _playerFloats.back().get();
 	}
-	Window::AbstractSectionWidget *getFloatPlayerSection(gsl::not_null<Window::Column*> column) const;
-	void finishFloatPlayerDrag(gsl::not_null<Float*> instance, bool closed);
+	Window::AbstractSectionWidget *getFloatPlayerSection(not_null<Window::Column*> column) const;
+	void finishFloatPlayerDrag(not_null<Float*> instance, bool closed);
 	void updateFloatPlayerColumnCorner(QPoint center);
-	QPoint getFloatPlayerPosition(gsl::not_null<Float*> instance) const;
+	QPoint getFloatPlayerPosition(not_null<Float*> instance) const;
 	QPoint getFloatPlayerHiddenPosition(QPoint position, QSize size, RectPart side) const;
 	RectPart getFloatPlayerSide(QPoint center) const;
 
@@ -596,7 +590,7 @@ private:
 	void viewsIncrementDone(QVector<MTPint> ids, const MTPVector<MTPint> &result, mtpRequestId req);
 	bool viewsIncrementFail(const RPCError &error, mtpRequestId req);
 
-	gsl::not_null<Window::Controller*> _controller;
+	not_null<Window::Controller*> _controller;
 	bool _started = false;
 
 	OrderedSet<WebPageId> _webPagesUpdated;

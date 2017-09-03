@@ -246,10 +246,10 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_no_chats" = "Your chats will be here";
 "lng_contacts_loading" = "Loading...";
 "lng_contacts_not_found" = "No contacts found";
-"lng_dlg_search_chat" = "Search in this chat";
-"lng_dlg_search_channel" = "Search in this channel";
 "lng_dlg_search_for_messages" = "Search for messages";
 "lng_update_telegram" = "Update Telegram";
+"lng_dlg_search_in" = "Search messages in";
+"lng_dlg_search_from" = "From: {user}";
 
 "lng_settings_save" = "Save";
 "lng_settings_upload" = "Set Profile Photo";
@@ -549,6 +549,10 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_change_phone_code_title" = "Enter code";
 "lng_change_phone_code_description" = "We've sent an SMS with a confirmation code to your phone {phone}.";
 "lng_change_phone_success" = "Your phone number has been changed.";
+
+"lng_mute_duration_hours#one" = "For {count} hour";
+"lng_mute_duration_hours#other" = "For {count} hours";
+"lng_mute_box_tip" = "Choose duration of turning off notifications from the following chat";
 
 "lng_preview_loading" = "Getting Link Info...";
 
@@ -880,6 +884,13 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_emoji_hide_panel" = "Click here to hide the emoji sidebar";
 
 "lng_recent_stickers" = "Frequently used";
+"lng_faved_stickers" = "Favorite stickers";
+"lng_faved_stickers_add" = "Add to Favorites";
+"lng_faved_stickers_remove" = "Remove from Favorites";
+"lng_group_stickers" = "Group stickers";
+"lng_group_stickers_description" = "You can choose sticker set which will be available for every member while in the group chat.";
+"lng_group_stickers_add" = "Choose sticker set";
+
 "lng_switch_stickers" = "Stickers";
 "lng_switch_emoji" = "Emoji";
 "lng_switch_gifs" = "GIFs";
@@ -909,6 +920,9 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_stickers_count#one" = "{count} sticker";
 "lng_stickers_count#other" = "{count} stickers";
 "lng_stickers_masks_pack" = "This is a pack of mask stickers. You can use them in the photo editor on our mobile apps.";
+"lng_stickers_group_set" = "Group sticker set";
+"lng_stickers_remove_group_set" = "Remove group sticker set?";
+"lng_stickers_group_from_your" = "Choose from your stickers";
 
 "lng_in_dlg_photo" = "Photo";
 "lng_in_dlg_video" = "Video";
@@ -986,13 +1000,13 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_typing" = "typing";
 "lng_user_typing" = "{user} is typing";
 "lng_users_typing" = "{user} and {second_user} are typing";
-"lng_many_typing#one" = "{count} is typing";
-"lng_many_typing#other" = "{count} are typing";
+"lng_many_typing#one" = "{count} person is typing";
+"lng_many_typing#other" = "{count} people are typing";
 "lng_playing_game" = "playing a game";
 "lng_user_playing_game" = "{user} is playing a game";
 "lng_users_playing_game" = "{user} and {second_user} are playing a game";
-"lng_many_playing_game#one" = "{count} is playing a game";
-"lng_many_playing_game#other" = "{count} are playing a game";
+"lng_many_playing_game#one" = "{count} person is playing a game";
+"lng_many_playing_game#other" = "{count} people are playing a game";
 "lng_send_action_record_video" = "recording a video";
 "lng_user_action_record_video" = "{user} is recording a video";
 "lng_send_action_upload_video" = "sending a video";
@@ -1399,6 +1413,9 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_admin_log_banned" = "banned {user}";
 "lng_admin_log_restricted" = "changed restrictions for {user} {until}";
 "lng_admin_log_promoted" = "changed privileges for {user}";
+"lng_admin_log_changed_stickers_group" = "{from} changed group {sticker_set}";
+"lng_admin_log_changed_stickers_set" = "sticker set";
+"lng_admin_log_removed_stickers_group" = "{from} removed group sticker set";
 "lng_admin_log_user_with_username" = "{name} ({mention})";
 "lng_admin_log_restricted_forever" = "indefinitely";
 "lng_admin_log_restricted_until" = "until {date}";
@@ -1423,6 +1440,8 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 "lng_profile_group_info" = "Group info";
 "lng_profile_channel_info" = "Channel info";
 "lng_channel_add_admins" = "New administrator";
+"lng_dlg_search_chat" = "Search in this chat";
+"lng_dlg_search_channel" = "Search in this channel";
 
 // Wnd specific
 

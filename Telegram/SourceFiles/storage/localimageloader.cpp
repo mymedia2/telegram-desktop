@@ -28,6 +28,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "mainwindow.h"
 #include "lang/lang_keys.h"
 #include "boxes/confirm_box.h"
+#include "storage/file_download.h"
 
 namespace {
 
@@ -342,7 +343,7 @@ void FileLoadTask::process() {
 		// Voice sending is supported only from memory for now.
 		// Because for voice we force mime type and don't read MediaInformation.
 		// For a real file we always read mime type and read MediaInformation.
-		t_assert(!isVoice);
+		Assert(!isVoice);
 
 		filesize = info.size();
 		filename = info.fileName();
@@ -421,9 +422,9 @@ void FileLoadTask::process() {
 
 	QVector<MTPDocumentAttribute> attributes(1, MTP_documentAttributeFilename(MTP_string(filename)));
 
-	MTPPhotoSize thumbSize(MTP_photoSizeEmpty(MTP_string("")));
-	MTPPhoto photo(MTP_photoEmpty(MTP_long(0)));
-	MTPDocument document(MTP_documentEmpty(MTP_long(0)));
+	auto thumbSize = MTP_photoSizeEmpty(MTP_string(""));
+	auto photo = MTP_photoEmpty(MTP_long(0));
+	auto document = MTP_documentEmpty(MTP_long(0));
 
 	if (!isVoice) {
 		if (!_information) {
@@ -512,8 +513,14 @@ void FileLoadTask::process() {
 			}
 
 			QByteArray thumbFormat = "JPG";
-			int32 thumbQuality = 87;
-			if (!isAnimation && filemime == stickerMime && w > 0 && h > 0 && w <= StickerMaxSize && h <= StickerMaxSize && filesize < StickerInMemory) {
+			auto thumbQuality = 87;
+			if (!isAnimation
+				&& filemime == stickerMime
+				&& w > 0
+				&& h > 0
+				&& w <= StickerMaxSize
+				&& h <= StickerMaxSize
+				&& filesize < Storage::kMaxStickerInMemory) {
 				attributes.push_back(MTP_documentAttributeSticker(MTP_flags(0), MTP_string(""), MTP_inputStickerSetEmpty(), MTPMaskCoords()));
 				thumbFormat = "webp";
 				thumbname = qsl("thumb.webp");
@@ -531,6 +538,10 @@ void FileLoadTask::process() {
 
 			thumbId = rand_value<uint64>();
 		}
+	}
+
+	if (_type == SendMediaType::Photo && photo.type() == mtpc_photoEmpty) {
+		_type = SendMediaType::File;
 	}
 
 	if (isVoice) {

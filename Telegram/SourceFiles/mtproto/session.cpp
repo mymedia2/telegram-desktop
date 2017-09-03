@@ -86,7 +86,7 @@ void SessionData::clear(Instance *instance) {
 	instance->clearCallbacksDelayed(clearCallbacks);
 }
 
-Session::Session(gsl::not_null<Instance*> instance, ShiftedDcId shiftedDcId) : QObject()
+Session::Session(not_null<Instance*> instance, ShiftedDcId shiftedDcId) : QObject()
 , _instance(instance)
 , data(this)
 , dcWithShift(shiftedDcId) {
@@ -552,7 +552,7 @@ void Session::tryToReceive() {
 }
 
 Session::~Session() {
-	t_assert(_connection == nullptr);
+	Assert(_connection == nullptr);
 }
 
 MTPrpcError rpcClientError(const QString &type, const QString &description) {

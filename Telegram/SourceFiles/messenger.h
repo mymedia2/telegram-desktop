@@ -22,6 +22,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 
 #include "base/observer.h"
 #include "mtproto/auth_key.h"
+#include "base/timer.h"
 
 namespace App {
 void quit();
@@ -40,6 +41,7 @@ class AuthSessionData;
 class MainWidget;
 class FileUploader;
 class Translator;
+class MediaView;
 
 namespace Local {
 struct StoredAuthSession;
@@ -68,7 +70,24 @@ public:
 
 	~Messenger();
 
-	MainWindow *mainWindow();
+	// Windows interface.
+	MainWindow *getActiveWindow() const;
+	bool closeActiveWindow();
+	bool minimizeActiveWindow();
+	QWidget *getFileDialogParent();
+	QWidget *getGlobalShortcutParent() {
+		return &_globalShortcutParent;
+	}
+
+	// MediaView interface.
+	void checkMediaViewActivation();
+	bool hideMediaView();
+	void showPhoto(not_null<const PhotoOpenClickHandler*> link, HistoryItem *item = nullptr);
+	void showPhoto(not_null<PhotoData*> photo, HistoryItem *item);
+	void showPhoto(not_null<PhotoData*> photo, PeerData *item);
+	void showDocument(not_null<DocumentData*> document, HistoryItem *item);
+	PeerData *ui_getPeerForMouseAction();
+
 	QPoint getPointForCallPanelCenter() const;
 	QImage logo() const {
 		return _logo;
@@ -80,7 +99,7 @@ public:
 	static Messenger *InstancePointer();
 	static Messenger &Instance() {
 		auto result = InstancePointer();
-		t_assert(result != nullptr);
+		Assert(result != nullptr);
 		return *result;
 	}
 
@@ -135,7 +154,6 @@ public:
 	void checkStartUrl();
 	bool openLocalUrl(const QString &url);
 
-	FileUploader *uploader();
 	void uploadProfilePhoto(const QImage &tosend, const PeerId &peerId);
 	void regPhotoUpdate(const PeerId &peer, const FullMsgId &msgId);
 	bool isPhotoUpdating(const PeerId &peer);
@@ -170,6 +188,13 @@ public:
 	void call_handleDelayedPeerUpdates();
 	void call_handleObservables();
 
+	void callDelayed(int duration, base::lambda_once<void()> &&lambda) {
+		_callDelayedTimer.call(duration, std::move(lambda));
+	}
+
+protected:
+	bool eventFilter(QObject *object, QEvent *event) override;
+
 signals:
 	void peerPhotoDone(PeerId peer);
 	void peerPhotoFail(PeerId peer);
@@ -194,6 +219,8 @@ private:
 	static void QuitAttempt();
 	void quitDelayed();
 
+	void loggedOut();
+
 	QMap<FullMsgId, PeerId> photoUpdates;
 
 	QMap<MTP::DcId, TimeMs> killDownloadSessionTimes;
@@ -203,9 +230,10 @@ private:
 	struct Private;
 	const std::unique_ptr<Private> _private;
 
-	std::unique_ptr<MainWindow> _window;
-	FileUploader *_uploader = nullptr;
+	QWidget _globalShortcutParent;
 
+	std::unique_ptr<MainWindow> _window;
+	std::unique_ptr<MediaView> _mediaView;
 	std::unique_ptr<Lang::Instance> _langpack;
 	std::unique_ptr<Lang::CloudManager> _langCloudManager;
 	std::unique_ptr<Lang::Translator> _translator;
@@ -219,5 +247,7 @@ private:
 	std::unique_ptr<Media::Audio::Instance> _audio;
 	QImage _logo;
 	QImage _logoNoMargin;
+
+	base::DelayedCallTimer _callDelayedTimer;
 
 };

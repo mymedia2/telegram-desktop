@@ -312,7 +312,7 @@ void Application::startApplication() {
 }
 
 void Application::createMessenger() {
-	t_assert(!App::quitting());
+	Expects(!App::quitting());
 	_messengerInstance = std::make_unique<Messenger>();
 }
 
@@ -454,7 +454,7 @@ void Application::startUpdateCheck(bool forceWait) {
 	if (!Sandbox::started()) return;
 
 	_updateCheckTimer->stop();
-	if (_updateThread || _updateReply || !cAutoUpdate()) return;
+	if (_updateThread || _updateReply || !cAutoUpdate() || cExeName().isEmpty()) return;
 
 	int32 constDelay = cBetaVersion() ? 600 : UpdateDelayConstPart, randDelay = cBetaVersion() ? 300 : UpdateDelayRandPart;
 	int32 updateInSecs = cLastUpdateCheck() + constDelay + int32(rand() % randDelay) - unixtime();
@@ -622,7 +622,7 @@ void connect(const char *signal, QObject *object, const char *method) {
 }
 
 void launch() {
-	t_assert(application() != 0);
+	Assert(application() != 0);
 
 	float64 dpi = Application::primaryScreen()->logicalDotsPerInch();
 	if (dpi <= 108) { // 0-96-108

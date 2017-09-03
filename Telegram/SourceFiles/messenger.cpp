@@ -35,6 +35,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "observer_peer.h"
 #include "storage/file_upload.h"
 #include "mainwidget.h"
+#include "mediaview.h"
 #include "mtproto/dc_options.h"
 #include "mtproto/mtp_instance.h"
 #include "media/player/media_player_instance.h"
@@ -129,6 +130,9 @@ Messenger::Messenger() : QObject()
 	_window->createWinId();
 	_window->init();
 
+	_mediaView = std::make_unique<MediaView>();
+
+	QCoreApplication::instance()->installEventFilter(this);
 	Sandbox::connect(SIGNAL(applicationStateChanged(Qt::ApplicationState)), this, SLOT(onAppStateChanged(Qt::ApplicationState)));
 
 	DEBUG_LOG(("Application Info: window created..."));
@@ -180,6 +184,99 @@ Messenger::Messenger() : QObject()
 	}
 }
 
+bool Messenger::hideMediaView() {
+	if (_mediaView && !_mediaView->isHidden()) {
+		_mediaView->hide();
+		if (auto activeWindow = getActiveWindow()) {
+			activeWindow->reActivateWindow();
+		}
+		return true;
+	}
+	return false;
+}
+
+void Messenger::showPhoto(not_null<const PhotoOpenClickHandler*> link, HistoryItem *item) {
+	return (!item && link->peer())
+		? showPhoto(link->photo(), link->peer())
+		: showPhoto(link->photo(), item);
+}
+
+void Messenger::showPhoto(not_null<PhotoData*> photo, HistoryItem *item) {
+	if (_mediaView->isHidden()) Ui::hideLayer(true);
+	_mediaView->showPhoto(photo, item);
+	_mediaView->activateWindow();
+	_mediaView->setFocus();
+}
+
+void Messenger::showPhoto(not_null<PhotoData*> photo, PeerData *peer) {
+	if (_mediaView->isHidden()) Ui::hideLayer(true);
+	_mediaView->showPhoto(photo, peer);
+	_mediaView->activateWindow();
+	_mediaView->setFocus();
+}
+
+void Messenger::showDocument(not_null<DocumentData*> document, HistoryItem *item) {
+	if (cUseExternalVideoPlayer() && document->isVideo()) {
+		QDesktopServices::openUrl(QUrl("file:///" + document->location(false).fname));
+	} else {
+		if (_mediaView->isHidden()) Ui::hideLayer(true);
+		_mediaView->showDocument(document, item);
+		_mediaView->activateWindow();
+		_mediaView->setFocus();
+	}
+}
+
+PeerData *Messenger::ui_getPeerForMouseAction() {
+	if (_mediaView && !_mediaView->isHidden()) {
+		return _mediaView->ui_getPeerForMouseAction();
+	} else if (auto main = App::main()) {
+		return main->ui_getPeerForMouseAction();
+	}
+	return nullptr;
+}
+
+bool Messenger::eventFilter(QObject *object, QEvent *e) {
+	switch (e->type()) {
+	case QEvent::KeyPress:
+	case QEvent::MouseButtonPress:
+	case QEvent::TouchBegin:
+	case QEvent::Wheel: {
+		psUserActionDone();
+	} break;
+
+	case QEvent::ShortcutOverride: {
+		// handle shortcuts ourselves
+		return true;
+	} break;
+
+	case QEvent::Shortcut: {
+		DEBUG_LOG(("Shortcut event caught: %1").arg(static_cast<QShortcutEvent*>(e)->key().toString()));
+		if (Shortcuts::launch(static_cast<QShortcutEvent*>(e)->shortcutId())) {
+			return true;
+		}
+	} break;
+
+	case QEvent::ApplicationActivate: {
+		if (object == QCoreApplication::instance()) {
+			psUserActionDone();
+		}
+	} break;
+
+	case QEvent::FileOpen: {
+		if (object == QCoreApplication::instance()) {
+			auto url = QString::fromUtf8(static_cast<QFileOpenEvent*>(e)->url().toEncoded().trimmed());
+			if (url.startsWith(qstr("tg://"), Qt::CaseInsensitive)) {
+				cSetStartUrl(url.mid(0, 8192));
+				checkStartUrl();
+			}
+			_window->activate();
+		}
+	} break;
+	}
+
+	return QObject::eventFilter(object, e);
+}
+
 void Messenger::setMtpMainDcId(MTP::DcId mainDcId) {
 	Expects(!_mtproto);
 	_private->mtpConfig.mainDcId = mainDcId;
@@ -211,7 +308,7 @@ QByteArray Messenger::serializeMtpAuthorization() const {
 			QDataStream stream(&result, QIODevice::WriteOnly);
 			stream.setVersion(QDataStream::Qt_5_1);
 
-			auto currentUserId = AuthSession::Exists() ? AuthSession::CurrentUserId() : 0;
+			auto currentUserId = _authSession ? _authSession->userId() : 0;
 			stream << qint32(currentUserId) << qint32(mainDcId);
 			writeKeys(stream, keys);
 			writeKeys(stream, keysToDestroy);
@@ -243,8 +340,8 @@ void Messenger::setAuthSessionFromStorage(std::unique_ptr<Local::StoredAuthSessi
 AuthSessionData *Messenger::getAuthSessionData() {
 	if (_private->authSessionUserId) {
 		return _private->storedAuthSession ? &_private->storedAuthSession->data : nullptr;
-	} else if (AuthSession::Exists()) {
-		return &AuthSession::Current().data();
+	} else if (_authSession) {
+		return &_authSession->data();
 	}
 	return nullptr;
 }
@@ -314,7 +411,7 @@ void Messenger::startMtp() {
 		if (_authSession) {
 			_authSession->data().copyFrom(_private->storedAuthSession->data);
 			if (auto window = App::wnd()) {
-				t_assert(window->controller() != nullptr);
+				Assert(window->controller() != nullptr);
 				window->controller()->dialogsWidthRatio().set(_private->storedAuthSession->dialogsWidthRatio);
 			}
 		}
@@ -347,7 +444,7 @@ void Messenger::onAllKeysDestroyed() {
 }
 
 void Messenger::suggestMainDcId(MTP::DcId mainDcId) {
-	t_assert(_mtproto != nullptr);
+	Assert(_mtproto != nullptr);
 
 	_mtproto->suggestMainDcId(mainDcId);
 	if (_private->mtpConfig.mainDcId != MTP::Instance::Config::kNotSetMainDc) {
@@ -356,7 +453,7 @@ void Messenger::suggestMainDcId(MTP::DcId mainDcId) {
 }
 
 void Messenger::destroyStaleAuthorizationKeys() {
-	t_assert(_mtproto != nullptr);
+	Assert(_mtproto != nullptr);
 
 	auto keys = _mtproto->getKeysForWrite();
 	for (auto &key : keys) {
@@ -459,7 +556,7 @@ bool Messenger::peerPhotoFail(PeerId peer, const RPCError &error) {
 void Messenger::peerClearPhoto(PeerId id) {
 	if (!AuthSession::Exists()) return;
 
-	if (id == AuthSession::CurrentUserPeerId()) {
+	if (id == Auth().userPeerId()) {
 		MTP::send(MTPphotos_UpdateProfilePhoto(MTP_inputPhotoEmpty()), rpcDone(&Messenger::selfPhotoCleared), rpcFail(&Messenger::peerPhotoFail, id));
 	} else if (peerIsChat(id)) {
 		MTP::send(MTPmessages_EditChatPhoto(peerToBareMTPInt(id), MTP_inputChatPhotoEmpty()), rpcDone(&Messenger::chatPhotoCleared, id), rpcFail(&Messenger::peerPhotoFail, id));
@@ -554,7 +651,7 @@ void Messenger::photoUpdated(const FullMsgId &msgId, bool silent, const MTPInput
 	auto i = photoUpdates.find(msgId);
 	if (i != photoUpdates.end()) {
 		auto id = i.value();
-		if (id == AuthSession::CurrentUserPeerId()) {
+		if (id == Auth().userPeerId()) {
 			MTP::send(MTPphotos_UploadProfilePhoto(file), rpcDone(&Messenger::selfPhotoDone), rpcFail(&Messenger::peerPhotoFail, id));
 		} else if (peerIsChat(id)) {
 			auto history = App::history(id);
@@ -616,6 +713,8 @@ void Messenger::authSessionDestroy() {
 	_private->storedAuthSession.reset();
 	_private->authSessionUserId = 0;
 	authSessionChanged().notify(true);
+
+	loggedOut();
 }
 
 void Messenger::setInternalLinkDomain(const QString &domain) const {
@@ -748,11 +847,6 @@ bool Messenger::openLocalUrl(const QString &url) {
 	return false;
 }
 
-FileUploader *Messenger::uploader() {
-	if (!_uploader && !App::quitting()) _uploader = new FileUploader();
-	return _uploader;
-}
-
 void Messenger::uploadProfilePhoto(const QImage &tosend, const PeerId &peerId) {
 	PreparedPhotoThumbs photoThumbs;
 	QVector<MTPPhotoSize> photoSizes;
@@ -783,11 +877,11 @@ void Messenger::uploadProfilePhoto(const QImage &tosend, const PeerId &peerId) {
 
 	SendMediaReady ready(SendMediaType::Photo, file, filename, filesize, data, id, id, qsl("jpg"), peerId, photo, photoThumbs, MTP_documentEmpty(MTP_long(0)), jpeg, 0);
 
-	connect(App::uploader(), SIGNAL(photoReady(const FullMsgId&, bool, const MTPInputFile&)), App::app(), SLOT(photoUpdated(const FullMsgId&, bool, const MTPInputFile&)), Qt::UniqueConnection);
+	connect(&Auth().uploader(), SIGNAL(photoReady(const FullMsgId&, bool, const MTPInputFile&)), this, SLOT(photoUpdated(const FullMsgId&, bool, const MTPInputFile&)), Qt::UniqueConnection);
 
 	FullMsgId newId(peerToChannel(peerId), clientMsgId());
-	App::app()->regPhotoUpdate(peerId, newId);
-	App::uploader()->uploadMedia(newId, ready);
+	regPhotoUpdate(peerId, newId);
+	Auth().uploader().uploadMedia(newId, ready);
 }
 
 void Messenger::setupPasscode() {
@@ -805,6 +899,7 @@ Messenger::~Messenger() {
 	Expects(SingleInstance == this);
 
 	_window.reset();
+	_mediaView.reset();
 
 	// Some MTP requests can be cancelled from data clearing.
 	App::clearHistories();
@@ -825,8 +920,6 @@ Messenger::~Messenger() {
 	App::deinitMedia();
 	deinitLocationManager();
 
-	delete base::take(_uploader);
-
 	Window::Theme::Unload();
 
 	Media::Player::finish();
@@ -839,26 +932,74 @@ Messenger::~Messenger() {
 	SingleInstance = nullptr;
 }
 
-MainWindow *Messenger::mainWindow() {
+MainWindow *Messenger::getActiveWindow() const {
 	return _window.get();
 }
 
-QPoint Messenger::getPointForCallPanelCenter() const {
-	Expects(_window != nullptr);
-	Expects(_window->windowHandle() != nullptr);
-	if (_window->isActive()) {
-		return _window->geometry().center();
+bool Messenger::closeActiveWindow() {
+	if (hideMediaView()) {
+		return true;
 	}
-	return _window->windowHandle()->screen()->geometry().center();
+	if (auto activeWindow = getActiveWindow()) {
+		if (!activeWindow->hideNoQuit()) {
+			activeWindow->close();
+		}
+		return true;
+	}
+	return false;
+}
+
+bool Messenger::minimizeActiveWindow() {
+	hideMediaView();
+	if (auto activeWindow = getActiveWindow()) {
+		if (Global::WorkMode().value() == dbiwmTrayOnly) {
+			activeWindow->minimizeToTray();
+		} else {
+			activeWindow->setWindowState(Qt::WindowMinimized);
+		}
+		return true;
+	}
+	return false;
+}
+
+QWidget *Messenger::getFileDialogParent() {
+	return (_mediaView && _mediaView->isVisible()) ? (QWidget*)_mediaView.get() : (QWidget*)getActiveWindow();
+}
+
+void Messenger::checkMediaViewActivation() {
+	if (_mediaView && !_mediaView->isHidden()) {
+		_mediaView->activateWindow();
+		Sandbox::setActiveWindow(_mediaView.get());
+		_mediaView->setFocus();
+	}
+}
+
+void Messenger::loggedOut() {
+	if (_mediaView) {
+		hideMediaView();
+		_mediaView->rpcClear();
+		_mediaView->clearData();
+	}
+}
+
+QPoint Messenger::getPointForCallPanelCenter() const {
+	if (auto activeWindow = getActiveWindow()) {
+		Assert(activeWindow->windowHandle() != nullptr);
+		if (activeWindow->isActive()) {
+			return activeWindow->geometry().center();
+		}
+		return activeWindow->windowHandle()->screen()->geometry().center();
+	}
+	return QApplication::desktop()->screenGeometry().center();
 }
 
 void Messenger::QuitAttempt() {
 	auto prevents = false;
 	if (!Sandbox::isSavingSession() && AuthSession::Exists()) {
-		if (AuthSession::Current().api().isQuitPrevent()) {
+		if (Auth().api().isQuitPrevent()) {
 			prevents = true;
 		}
-		if (AuthSession::Current().calls().isQuitPrevent()) {
+		if (Auth().calls().isQuitPrevent()) {
 			prevents = true;
 		}
 	}

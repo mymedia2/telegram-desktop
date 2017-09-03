@@ -80,7 +80,7 @@ History::History(const PeerId &peerId)
 	if (peer->isUser() && peer->asUser()->botInfo) {
 		outboxReadBefore = INT_MAX;
 	}
-	for (auto &countData : overviewCountData) {
+	for (auto &countData : _overviewCountData) {
 		countData = -1; // not loaded yet
 	}
 }
@@ -127,7 +127,7 @@ void History::takeLocalDraft(History *from) {
 			_localDraft->msgId = 0;
 		}
 		from->clearLocalDraft();
-		App::api()->saveDraftToCloudDelayed(from);
+		Auth().api().saveDraftToCloudDelayed(from);
 	}
 }
 
@@ -440,7 +440,7 @@ HistoryJoined *ChannelHistory::insertJoinedMessage(bool unread) {
 	if (!inviter) return nullptr;
 
 	MTPDmessage::Flags flags = 0;
-	if (inviter->id == AuthSession::CurrentUserPeerId()) {
+	if (inviter->id == Auth().userPeerId()) {
 		unread = false;
 	//} else if (unread) {
 	//	flags |= MTPDmessage::Flag::f_unread;
@@ -589,7 +589,7 @@ History *Histories::find(const PeerId &peerId) {
 	return (i == map.cend()) ? 0 : i.value();
 }
 
-History *Histories::findOrInsert(const PeerId &peerId) {
+not_null<History*> Histories::findOrInsert(const PeerId &peerId) {
 	auto i = map.constFind(peerId);
 	if (i == map.cend()) {
 		auto history = peerIsChannel(peerId) ? static_cast<History*>(new ChannelHistory(peerId)) : (new History(peerId));
@@ -598,7 +598,7 @@ History *Histories::findOrInsert(const PeerId &peerId) {
 	return i.value();
 }
 
-History *Histories::findOrInsert(const PeerId &peerId, int32 unreadCount, int32 maxInboxRead, int32 maxOutboxRead) {
+not_null<History*> Histories::findOrInsert(const PeerId &peerId, int32 unreadCount, int32 maxInboxRead, int32 maxOutboxRead) {
 	auto i = map.constFind(peerId);
 	if (i == map.cend()) {
 		auto history = peerIsChannel(peerId) ? static_cast<History*>(new ChannelHistory(peerId)) : (new History(peerId));
@@ -722,7 +722,7 @@ void Histories::setIsPinned(History *history, bool isPinned) {
 					minIndexHistory = pinned;
 				}
 			}
-			t_assert(minIndexHistory != nullptr);
+			Assert(minIndexHistory != nullptr);
 			minIndexHistory->setPinnedDialog(false);
 		}
 	} else {
@@ -764,7 +764,7 @@ void Histories::savePinnedToServer() const {
 	MTP::send(MTPmessages_ReorderPinnedDialogs(MTP_flags(flags), MTP_vector(peers)));
 }
 
-void Histories::selfDestructIn(gsl::not_null<HistoryItem*> item, TimeMs delay) {
+void Histories::selfDestructIn(not_null<HistoryItem*> item, TimeMs delay) {
 	_selfDestructItems.push_back(item->fullId());
 	if (!_selfDestructTimer.isActive() || _selfDestructTimer.remainingTime() > delay) {
 		_selfDestructTimer.callOnce(delay);
@@ -1055,7 +1055,7 @@ HistoryItem *History::createItem(const MTPMessage &msg, bool applyServiceAction,
 			case mtpc_messageActionPinMessage: {
 				if (m.has_reply_to_msg_id() && result && result->history()->peer->isMegagroup()) {
 					result->history()->peer->asChannel()->mgInfo->pinnedMsgId = m.vreply_to_msg_id.v;
-					if (App::main()) emit App::main()->peerUpdated(result->history()->peer);
+					Notify::peerUpdatedDelayed(result->history()->peer, Notify::PeerUpdate::Flag::ChannelPinnedChanged);
 				}
 			} break;
 
@@ -1144,23 +1144,10 @@ HistoryItem *History::addNewGame(MsgId id, MTPDmessage::Flags flags, UserId viaB
 }
 
 bool History::addToOverview(MediaOverviewType type, MsgId msgId, AddToOverviewMethod method) {
-	bool adding = false;
-	switch (method) {
-	case AddToOverviewNew:
-	case AddToOverviewFront: adding = (overviewIds[type].constFind(msgId) == overviewIds[type].cend()); break;
-	case AddToOverviewBack: adding = (overviewCountData[type] != 0); break;
-	}
-	if (!adding) return false;
-
-	overviewIds[type].insert(msgId);
-	switch (method) {
-	case AddToOverviewNew:
-	case AddToOverviewBack: overview[type].push_back(msgId); break;
-	case AddToOverviewFront: overview[type].push_front(msgId); break;
-	}
+	_overview[type].insert(msgId);
 	if (method == AddToOverviewNew) {
-		if (overviewCountData[type] > 0) {
-			++overviewCountData[type];
+		if (_overviewCountData[type] > 0) {
+			++_overviewCountData[type];
 		}
 		Notify::mediaOverviewUpdated(peer, type);
 	}
@@ -1168,22 +1155,94 @@ bool History::addToOverview(MediaOverviewType type, MsgId msgId, AddToOverviewMe
 }
 
 void History::eraseFromOverview(MediaOverviewType type, MsgId msgId) {
-	if (overviewIds[type].isEmpty()) return;
+	auto i = _overview[type].find(msgId);
+	if (i == _overview[type].cend()) return;
 
-	auto i = overviewIds[type].find(msgId);
-	if (i == overviewIds[type].cend()) return;
-
-	overviewIds[type].erase(i);
-	for (auto i = overview[type].begin(), e = overview[type].end(); i != e; ++i) {
-		if ((*i) == msgId) {
-			overview[type].erase(i);
-			if (overviewCountData[type] > 0) {
-				--overviewCountData[type];
-			}
-			break;
-		}
+	_overview[type].erase(i);
+	if (_overviewCountData[type] > 0) {
+		--_overviewCountData[type];
 	}
 	Notify::mediaOverviewUpdated(peer, type);
+}
+
+void History::setUnreadMentionsCount(int count) {
+	if (_unreadMentions.size() > count) {
+		LOG(("API Warning: real mentions count is greater than received mentions count"));
+		count = _unreadMentions.size();
+	}
+	_unreadMentionsCount = count;
+}
+
+bool History::addToUnreadMentions(MsgId msgId, AddToOverviewMethod method) {
+	auto allLoaded = _unreadMentionsCount ? (_unreadMentions.size() >= *_unreadMentionsCount) : false;
+	if (allLoaded) {
+		if (method == AddToOverviewNew) {
+			++*_unreadMentionsCount;
+			_unreadMentions.insert(msgId);
+			return true;
+		}
+	} else if (!_unreadMentions.empty() && method != AddToOverviewNew) {
+		_unreadMentions.insert(msgId);
+		return true;
+	}
+	return false;
+}
+
+void History::eraseFromUnreadMentions(MsgId msgId) {
+	_unreadMentions.remove(msgId);
+	if (_unreadMentionsCount) {
+		if (*_unreadMentionsCount > 0) {
+			--*_unreadMentionsCount;
+		}
+	}
+	Notify::peerUpdatedDelayed(peer, Notify::PeerUpdate::Flag::UnreadMentionsChanged);
+}
+
+void History::addUnreadMentionsSlice(const MTPmessages_Messages &result) {
+	auto count = 0;
+	auto messages = (const QVector<MTPMessage>*)nullptr;
+	auto getMessages = [](auto &list) {
+		App::feedUsers(list.vusers);
+		App::feedChats(list.vchats);
+		return &list.vmessages.v;
+	};
+	switch (result.type()) {
+	case mtpc_messages_messages: {
+		auto &d = result.c_messages_messages();
+		messages = getMessages(d);
+		count = messages->size();
+	} break;
+
+	case mtpc_messages_messagesSlice: {
+		auto &d = result.c_messages_messagesSlice();
+		messages = getMessages(d);
+		count = d.vcount.v;
+	} break;
+
+	case mtpc_messages_channelMessages: {
+		LOG(("API Error: unexpected messages.channelMessages in History::addUnreadMentionsSlice"));
+		auto &d = result.c_messages_channelMessages();
+		messages = getMessages(d);
+		count = d.vcount.v;
+	} break;
+
+	default: Unexpected("type in History::addUnreadMentionsSlice");
+	}
+
+	auto added = false;
+	for (auto &message : *messages) {
+		if (auto item = addToHistory(message)) {
+			if (item->mentionsMe() && item->isMediaUnread()) {
+				_unreadMentions.insert(item->id);
+				added = true;
+			}
+		}
+	}
+	if (!added) {
+		count = _unreadMentions.size();
+	}
+	setUnreadMentionsCount(count);
+	Notify::peerUpdatedDelayed(peer, Notify::PeerUpdate::Flag::UnreadMentionsChanged);
 }
 
 HistoryItem *History::addNewItem(HistoryItem *adding, bool newMsg) {
@@ -1198,7 +1257,7 @@ HistoryItem *History::addNewItem(HistoryItem *adding, bool newMsg) {
 	adding->addToOverview(AddToOverviewNew);
 	if (adding->from()->id) {
 		if (auto user = adding->from()->asUser()) {
-			auto getLastAuthors = [this]() -> QList<gsl::not_null<UserData*>>* {
+			auto getLastAuthors = [this]() -> QList<not_null<UserData*>>* {
 				if (auto chat = peer->asChat()) {
 					return &chat->lastAuthors;
 				} else if (auto channel = peer->asMegagroup()) {
@@ -1232,7 +1291,7 @@ HistoryItem *History::addNewItem(HistoryItem *adding, bool newMsg) {
 		if (adding->definesReplyKeyboard()) {
 			auto markupFlags = adding->replyKeyboardFlags();
 			if (!(markupFlags & MTPDreplyKeyboardMarkup::Flag::f_selective) || adding->mentionsMe()) {
-				auto getMarkupSenders = [this]() -> OrderedSet<gsl::not_null<PeerData*>>* {
+				auto getMarkupSenders = [this]() -> OrderedSet<not_null<PeerData*>>* {
 					if (auto chat = peer->asChat()) {
 						return &chat->markupSenders;
 					} else if (auto channel = peer->asMegagroup()) {
@@ -1385,8 +1444,8 @@ void History::addOlderSlice(const QVector<MTPMessage> &slice) {
 	} else if (loadedAtBottom()) { // add photos to overview and authors to lastAuthors
 		bool channel = isChannel();
 		int32 mask = 0;
-		QList<gsl::not_null<UserData*>> *lastAuthors = nullptr;
-		OrderedSet<gsl::not_null<PeerData*>> *markupSenders = nullptr;
+		QList<not_null<UserData*>> *lastAuthors = nullptr;
+		OrderedSet<not_null<PeerData*>> *markupSenders = nullptr;
 		if (peer->isChat()) {
 			lastAuthors = &peer->asChat()->lastAuthors;
 			markupSenders = &peer->asChat()->markupSenders;
@@ -1484,7 +1543,7 @@ void History::addNewerSlice(const QVector<MTPMessage> &slice) {
 		}
 	}
 
-	t_assert(!isBuildingFrontBlock());
+	Assert(!isBuildingFrontBlock());
 	if (!slice.isEmpty()) {
 		bool atLeastOneAdded = false;
 		for (auto i = slice.cend(), e = slice.cbegin(); i != e;) {
@@ -1527,16 +1586,8 @@ void History::checkAddAllToOverview() {
 	}
 
 	int32 mask = 0;
-	for (int32 i = 0; i < OverviewCount; ++i) {
-		if (overviewCountData[i] == 0) continue; // all loaded
-		if (!overview[i].isEmpty() || !overviewIds[i].isEmpty()) {
-			overview[i].clear();
-			overviewIds[i].clear();
-			mask |= (1 << i);
-		}
-	}
-	for_const (HistoryBlock *block, blocks) {
-		for_const (HistoryItem *item, block->items) {
+	for_const (auto block, blocks) {
+		for_const (auto item, block->items) {
 			mask |= item->addToOverview(AddToOverviewBack);
 		}
 	}
@@ -1600,7 +1651,7 @@ MsgId History::inboxRead(MsgId upTo) {
 	}
 
 	showFrom = nullptr;
-	AuthSession::Current().notifications().clearFromHistory(this);
+	Auth().notifications().clearFromHistory(this);
 
 	return upTo;
 }
@@ -1746,7 +1797,7 @@ void History::countScrollTopItem(int top) {
 				auto item = block->items[itemIndex];
 				itemTop = block->y() + item->y();
 				if (itemTop > top) {
-					t_assert(itemIndex > 0 || blockIndex > 0);
+					Assert(itemIndex > 0 || blockIndex > 0);
 					if (itemIndex > 0) {
 						scrollTopItem = block->items[itemIndex - 1];
 					} else {
@@ -1820,15 +1871,15 @@ HistoryItem *History::addNewInTheMiddle(HistoryItem *newItem, int32 blockIndex, 
 }
 
 void History::startBuildingFrontBlock(int expectedItemsCount) {
-	t_assert(!isBuildingFrontBlock());
-	t_assert(expectedItemsCount > 0);
+	Assert(!isBuildingFrontBlock());
+	Assert(expectedItemsCount > 0);
 
 	_buildingFrontBlock.reset(new BuildingBlock());
 	_buildingFrontBlock->expectedItemsCount = expectedItemsCount;
 }
 
 HistoryBlock *History::finishBuildingFrontBlock() {
-	t_assert(isBuildingFrontBlock());
+	Assert(isBuildingFrontBlock());
 
 	// Some checks if there was some message history already
 	auto block = _buildingFrontBlock->block;
@@ -2048,6 +2099,21 @@ const ChannelHistory *History::asChannelHistory() const {
 	return isChannel() ? static_cast<const ChannelHistory*>(this) : 0;
 }
 
+not_null<History*> History::migrateToOrMe() const {
+	if (auto to = peer->migrateTo()) {
+		return App::history(to);
+	}
+	// We could get it by App::history(peer), but we optimize.
+	return const_cast<History*>(this);
+}
+
+History *History::migrateFrom() const {
+	if (auto from = peer->migrateFrom()) {
+		return App::history(from);
+	}
+	return nullptr;
+}
+
 bool History::isDisplayedEmpty() const {
 	return isEmpty() || ((blocks.size() == 1) && blocks.front()->items.size() == 1 && blocks.front()->items.front()->isEmpty());
 }
@@ -2077,18 +2143,15 @@ void History::clear(bool leaveItems) {
 			}
 		}
 	}
-	for (int32 i = 0; i < OverviewCount; ++i) {
-		if (!overview[i].isEmpty() || !overviewIds[i].isEmpty()) {
-			if (leaveItems) {
-				if (overviewCountData[i] == 0) {
-					overviewCountData[i] = overview[i].size();
+	if (!leaveItems) {
+		for (auto i = 0; i != OverviewCount; ++i) {
+			if (!_overview[i].isEmpty()) {
+				_overviewCountData[i] = -1; // not loaded yet
+				_overview[i].clear();
+				if (!App::quitting()) {
+					Notify::mediaOverviewUpdated(peer, MediaOverviewType(i));
 				}
-			} else {
-				overviewCountData[i] = -1; // not loaded yet
 			}
-			overview[i].clear();
-			overviewIds[i].clear();
-			if (!App::quitting()) Notify::mediaOverviewUpdated(peer, MediaOverviewType(i));
 		}
 	}
 	clearBlocks(leaveItems);
@@ -2116,7 +2179,7 @@ void History::clear(bool leaveItems) {
 		}
 	}
 	if (leaveItems) {
-		AuthSession::Current().data().historyCleared().notify(this, true);
+		Auth().data().historyCleared().notify(this, true);
 	}
 }
 
@@ -2136,7 +2199,7 @@ void History::clearOnDestroy() {
 }
 
 History::PositionInChatListChange History::adjustByPosInChatList(Dialogs::Mode list, Dialogs::IndexedList *indexed) {
-	t_assert(indexed != nullptr);
+	Assert(indexed != nullptr);
 	Dialogs::Row *lnk = mainChatListLink(list);
 	int32 movedFrom = lnk->pos();
 	indexed->adjustByPos(chatListLinks(list));
@@ -2149,7 +2212,7 @@ int History::posInChatList(Dialogs::Mode list) const {
 }
 
 Dialogs::Row *History::addToChatList(Dialogs::Mode list, Dialogs::IndexedList *indexed) {
-	t_assert(indexed != nullptr);
+	Assert(indexed != nullptr);
 	if (!inChatList(list)) {
 		chatListLinks(list) = indexed->addToEnd(this);
 		if (list == Dialogs::Mode::All && unreadCount()) {
@@ -2161,7 +2224,7 @@ Dialogs::Row *History::addToChatList(Dialogs::Mode list, Dialogs::IndexedList *i
 }
 
 void History::removeFromChatList(Dialogs::Mode list, Dialogs::IndexedList *indexed) {
-	t_assert(indexed != nullptr);
+	Assert(indexed != nullptr);
 	if (inChatList(list)) {
 		indexed->del(peer);
 		chatListLinks(list).clear();
@@ -2173,14 +2236,14 @@ void History::removeFromChatList(Dialogs::Mode list, Dialogs::IndexedList *index
 }
 
 void History::removeChatListEntryByLetter(Dialogs::Mode list, QChar letter) {
-	t_assert(letter != 0);
+	Assert(letter != 0);
 	if (inChatList(list)) {
 		chatListLinks(list).remove(letter);
 	}
 }
 
 void History::addChatListEntryByLetter(Dialogs::Mode list, QChar letter, Dialogs::Row *row) {
-	t_assert(letter != 0);
+	Assert(letter != 0);
 	if (inChatList(list)) {
 		chatListLinks(list).insert(letter, row);
 	}
@@ -2222,14 +2285,14 @@ void History::overviewSliceDone(int32 overviewIndex, const MTPmessages_Messages 
 		App::feedUsers(d.vusers);
 		App::feedChats(d.vchats);
 		v = &d.vmessages.v;
-		overviewCountData[overviewIndex] = 0;
+		_overviewCountData[overviewIndex] = 0;
 	} break;
 
 	case mtpc_messages_messagesSlice: {
 		auto &d(result.c_messages_messagesSlice());
 		App::feedUsers(d.vusers);
 		App::feedChats(d.vchats);
-		overviewCountData[overviewIndex] = d.vcount.v;
+		_overviewCountData[overviewIndex] = d.vcount.v;
 		v = &d.vmessages.v;
 	} break;
 
@@ -2242,7 +2305,7 @@ void History::overviewSliceDone(int32 overviewIndex, const MTPmessages_Messages 
 		}
 		App::feedUsers(d.vusers);
 		App::feedChats(d.vchats);
-		overviewCountData[overviewIndex] = d.vcount.v;
+		_overviewCountData[overviewIndex] = d.vcount.v;
 		v = &d.vmessages.v;
 	} break;
 
@@ -2250,42 +2313,22 @@ void History::overviewSliceDone(int32 overviewIndex, const MTPmessages_Messages 
 	}
 
 	if (!onlyCounts && v->isEmpty()) {
-		overviewCountData[overviewIndex] = 0;
-	} else if (overviewCountData[overviewIndex] > 0) {
-		for_const (auto msgId, overviewIds[overviewIndex]) {
-			if (msgId < 0) {
-				++overviewCountData[overviewIndex];
-			} else {
-				break;
-			}
-		}
+		_overviewCountData[overviewIndex] = 0;
 	}
 
-	for (QVector<MTPMessage>::const_iterator i = v->cbegin(), e = v->cend(); i != e; ++i) {
-		HistoryItem *item = App::histories().addNewMessage(*i, NewMessageExisting);
-		if (item && overviewIds[overviewIndex].constFind(item->id) == overviewIds[overviewIndex].cend()) {
-			overviewIds[overviewIndex].insert(item->id);
-			overview[overviewIndex].push_front(item->id);
+	for (auto i = v->cbegin(), e = v->cend(); i != e; ++i) {
+		if (auto item = App::histories().addNewMessage(*i, NewMessageExisting)) {
+			_overview[overviewIndex].insert(item->id);
 		}
 	}
 }
 
 void History::changeMsgId(MsgId oldId, MsgId newId) {
-	for (auto i = 0; i < OverviewCount; ++i) {
-		auto j = overviewIds[i].find(oldId);
-		if (j != overviewIds[i].cend()) {
-			overviewIds[i].erase(j);
-			auto index = overview[i].indexOf(oldId);
-			if (overviewIds[i].constFind(newId) == overviewIds[i].cend()) {
-				overviewIds[i].insert(newId);
-				if (index >= 0) {
-					overview[i][index] = newId;
-				} else {
-					overview[i].push_back(newId);
-				}
-			} else if (index >= 0) {
-				overview[i].removeAt(index);
-			}
+	for (auto i = 0; i != OverviewCount; ++i) {
+		auto j = _overview[i].find(oldId);
+		if (j != _overview[i].cend()) {
+			_overview[i].erase(j);
+			_overview[i].insert(newId);
 		}
 	}
 }

@@ -253,6 +253,11 @@ void SendFilesBox::prepare() {
 		connect(_caption, SIGNAL(submitted(bool)), this, SLOT(onSend(bool)));
 		connect(_caption, SIGNAL(cancelled()), this, SLOT(onClose()));
 	}
+	subscribe(boxClosing, [this] {
+		if (!_confirmed && _cancelledCallback) {
+			_cancelledCallback();
+		}
+	});
 	_send->setText(getSendButtonText());
 	updateButtonsGeometry();
 	updateBoxSize();
@@ -444,12 +449,6 @@ void SendFilesBox::onSend(bool ctrlShiftEnter) {
 	closeBox();
 }
 
-void SendFilesBox::closeHook() {
-	if (!_confirmed && _cancelledCallback) {
-		_cancelledCallback();
-	}
-}
-
 EditCaptionBox::EditCaptionBox(QWidget*, HistoryMedia *media, FullMsgId msgId) : _msgId(msgId) {
 	Expects(media->canEditCaption());
 
@@ -562,7 +561,7 @@ EditCaptionBox::EditCaptionBox(QWidget*, HistoryMedia *media, FullMsgId msgId) :
 		_thumb = App::pixmapFromImageInPlace(_thumb.toImage().scaled(_thumbw * cIntRetinaFactor(), _thumbh * cIntRetinaFactor(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 		_thumb.setDevicePixelRatio(cRetinaFactor());
 	}
-	t_assert(_animated || _photo || _doc);
+	Assert(_animated || _photo || _doc);
 
 	_field.create(this, st::confirmCaptionArea, langFactory(lng_photo_caption), caption);
 	_field->setMaxLength(MaxPhotoCaption);
@@ -758,7 +757,7 @@ void EditCaptionBox::onSave(bool ctrlShiftEnter) {
 		return;
 	}
 
-	auto flags = qFlags(MTPmessages_EditMessage::Flag::f_message);
+	auto flags = MTPmessages_EditMessage::Flag::f_message | 0;
 	if (_previewCancelled) {
 		flags |= MTPmessages_EditMessage::Flag::f_no_webpage;
 	}

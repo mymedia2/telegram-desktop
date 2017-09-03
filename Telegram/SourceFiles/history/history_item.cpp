@@ -227,8 +227,8 @@ int ReplyKeyboard::naturalHeight() const {
 }
 
 void ReplyKeyboard::paint(Painter &p, int outerWidth, const QRect &clip, TimeMs ms) const {
-	t_assert(_st != nullptr);
-	t_assert(_width > 0);
+	Assert(_st != nullptr);
+	Assert(_width > 0);
 
 	_st->startPaint(p);
 	for_const (auto &row, _rows) {
@@ -246,7 +246,7 @@ void ReplyKeyboard::paint(Painter &p, int outerWidth, const QRect &clip, TimeMs 
 }
 
 ClickHandlerPtr ReplyKeyboard::getState(QPoint point) const {
-	t_assert(_width > 0);
+	Assert(_width > 0);
 
 	for_const (auto &row, _rows) {
 		for_const (auto &button, row) {
@@ -557,6 +557,8 @@ HistoryMessageLogEntryOriginal &HistoryMessageLogEntryOriginal::operator=(Histor
 
 HistoryMessageLogEntryOriginal::~HistoryMessageLogEntryOriginal() = default;
 
+HistoryMediaPtr::HistoryMediaPtr() = default;
+
 HistoryMediaPtr::HistoryMediaPtr(std::unique_ptr<HistoryMedia> pointer) : _pointer(std::move(pointer)) {
 	if (_pointer) {
 		_pointer->attachToParent();
@@ -600,9 +602,14 @@ TextSelection shiftSelection(TextSelection selection, uint16 byLength) {
 
 } // namespace internal
 
-HistoryItem::HistoryItem(History *history, MsgId msgId, MTPDmessage::Flags flags, QDateTime msgDate, int32 from) : HistoryElement()
-, id(msgId)
-, date(msgDate)
+HistoryItem::HistoryItem(
+	not_null<History*> history,
+	MsgId id,
+	MTPDmessage::Flags flags,
+	QDateTime date,
+	UserId from) : HistoryElement()
+, id(id)
+, date(date)
 , _history(history)
 , _from(from ? App::user(from) : history->peer)
 , _flags(flags | MTPDmessage_ClientFlag::f_pending_init_dimensions | MTPDmessage_ClientFlag::f_pending_resize)
@@ -658,6 +665,15 @@ void HistoryItem::finishEditionToEmpty() {
 	}
 }
 
+void HistoryItem::markMediaRead() {
+	_flags &= ~MTPDmessage::Flag::f_media_unread;
+
+	if (mentionsMe()) {
+		history()->updateChatListEntry();
+		history()->eraseFromUnreadMentions(id);
+	}
+}
+
 void HistoryItem::clickHandlerActiveChanged(const ClickHandlerPtr &p, bool active) {
 	if (auto markup = Get<HistoryMessageReplyMarkup>()) {
 		if (markup->inlineKeyboard) {
@@ -688,7 +704,7 @@ void HistoryItem::addLogEntryOriginal(WebPageId localId, const QString &label, c
 
 void HistoryItem::destroy() {
 	if (isLogEntry()) {
-		t_assert(detached());
+		Assert(detached());
 	} else {
 		// All this must be done for all items manually in History::clear(false)!
 		eraseFromOverview();
@@ -744,7 +760,7 @@ void HistoryItem::nextItemChanged() {
 	setAttachToNext(false);
 }
 
-bool HistoryItem::computeIsAttachToPrevious(gsl::not_null<HistoryItem*> previous) {
+bool HistoryItem::computeIsAttachToPrevious(not_null<HistoryItem*> previous) {
 	if (!Has<HistoryMessageDate>() && !Has<HistoryMessageUnreadBar>()) {
 		return !isPost() && !previous->isPost()
 			&& !serviceMsg() && !previous->serviceMsg()
@@ -942,7 +958,7 @@ bool HistoryItem::hasDirectLink() const {
 QString HistoryItem::directLink() const {
 	if (hasDirectLink()) {
 		auto channel = _history->peer->asChannel();
-		t_assert(channel != nullptr);
+		Assert(channel != nullptr);
 		auto query = channel->username + '/' + QString::number(id);
 		if (!channel->isMegagroup()) {
 			if (auto media = getMedia()) {
@@ -996,7 +1012,7 @@ bool HistoryItem::unread() const {
 
 void HistoryItem::destroyUnreadBar() {
 	if (Has<HistoryMessageUnreadBar>()) {
-		t_assert(!isLogEntry());
+		Assert(!isLogEntry());
 
 		RemoveComponents(HistoryMessageUnreadBar::Bit());
 		setPendingInitDimensions();
@@ -1057,7 +1073,7 @@ void HistoryItem::clipCallback(Media::Clip::Notification notification) {
 		auto stopped = false;
 		if (reader->autoPausedGif()) {
 			auto amVisible = false;
-			AuthSession::Current().data().queryItemVisibility().notify({ this, &amVisible }, true);
+			Auth().data().queryItemVisibility().notify({ this, &amVisible }, true);
 			if (!amVisible) { // stop animation if it is not visible
 				media->stopInline();
 				if (auto document = media->getDocument()) { // forget data from memory
@@ -1182,8 +1198,8 @@ void HistoryItem::drawInDialog(Painter &p, const QRect &r, bool active, bool sel
 
 HistoryItem::~HistoryItem() {
 	App::historyUnregItem(this);
-	if (id < 0 && App::uploader()) {
-		App::uploader()->cancel(fullId());
+	if (id < 0 && !App::quitting()) {
+		Auth().uploader().cancel(fullId());
 	}
 }
 

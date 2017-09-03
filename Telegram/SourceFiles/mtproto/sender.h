@@ -64,12 +64,12 @@ class Sender {
 			using Callback = typename Policy::Callback;
 
 		public:
-			DoneHandler(gsl::not_null<Sender*> sender, Callback handler) : _sender(sender), _handler(std::move(handler)) {
+			DoneHandler(not_null<Sender*> sender, Callback handler) : _sender(sender), _handler(std::move(handler)) {
 			}
 
 			void operator()(mtpRequestId requestId, const mtpPrime *from, const mtpPrime *end) override {
 				auto handler = std::move(_handler);
-				_sender->requestHandled(requestId);
+				_sender->senderRequestHandled(requestId);
 
 				if (handler) {
 					auto result = Response();
@@ -79,7 +79,7 @@ class Sender {
 			}
 
 		private:
-			gsl::not_null<Sender*> _sender;
+			not_null<Sender*> _sender;
 			Callback _handler;
 
 		};
@@ -103,7 +103,7 @@ class Sender {
 			using Callback = typename Policy::Callback;
 
 		public:
-			FailHandler(gsl::not_null<Sender*> sender, Callback handler, FailSkipPolicy skipPolicy)
+			FailHandler(not_null<Sender*> sender, Callback handler, FailSkipPolicy skipPolicy)
 				: _sender(sender)
 				, _handler(std::move(handler))
 				, _skipPolicy(skipPolicy) {
@@ -121,7 +121,7 @@ class Sender {
 				}
 
 				auto handler = std::move(_handler);
-				_sender->requestHandled(requestId);
+				_sender->senderRequestHandled(requestId);
 
 				if (handler) {
 					Policy::handle(std::move(handler), requestId, error);
@@ -130,13 +130,13 @@ class Sender {
 			}
 
 		private:
-			gsl::not_null<Sender*> _sender;
+			not_null<Sender*> _sender;
 			Callback _handler;
 			FailSkipPolicy _skipPolicy = FailSkipPolicy::Simple;
 
 		};
 
-		explicit RequestBuilder(gsl::not_null<Sender*> sender) noexcept : _sender(sender) {
+		explicit RequestBuilder(not_null<Sender*> sender) noexcept : _sender(sender) {
 		}
 		RequestBuilder(RequestBuilder &&other) = default;
 
@@ -183,15 +183,15 @@ class Sender {
 			return _afterRequestId;
 		}
 
-		gsl::not_null<Sender*> sender() const noexcept {
+		not_null<Sender*> sender() const noexcept {
 			return _sender;
 		}
 		void registerRequest(mtpRequestId requestId) {
-			_sender->requestRegister(requestId);
+			_sender->senderRequestRegister(requestId);
 		}
 
 	private:
-		gsl::not_null<Sender*> _sender;
+		not_null<Sender*> _sender;
 		ShiftedDcId _dcId = 0;
 		TimeMs _canWait = 0;
 		RPCDoneHandlerPtr _done;
@@ -209,7 +209,7 @@ public:
 	class SpecificRequestBuilder : public RequestBuilder {
 	private:
 		friend class Sender;
-		SpecificRequestBuilder(gsl::not_null<Sender*> sender, Request &&request) noexcept : RequestBuilder(sender), _request(std::move(request)) {
+		SpecificRequestBuilder(not_null<Sender*> sender, Request &&request) noexcept : RequestBuilder(sender), _request(std::move(request)) {
 		}
 		SpecificRequestBuilder(SpecificRequestBuilder &&other) = default;
 
@@ -265,16 +265,16 @@ public:
 	class SentRequestWrap {
 	private:
 		friend class Sender;
-		SentRequestWrap(gsl::not_null<Sender*> sender, mtpRequestId requestId) : _sender(sender), _requestId(requestId) {
+		SentRequestWrap(not_null<Sender*> sender, mtpRequestId requestId) : _sender(sender), _requestId(requestId) {
 		}
 
 	public:
 		void cancel() {
-			_sender->requestCancel(_requestId);
+			_sender->senderRequestCancel(_requestId);
 		}
 
 	private:
-		gsl::not_null<Sender*> _sender;
+		not_null<Sender*> _sender;
 		mtpRequestId _requestId = 0;
 
 	};
@@ -284,6 +284,12 @@ public:
 
 	SentRequestWrap request(mtpRequestId requestId) noexcept WARN_UNUSED_RESULT;
 
+	decltype(auto) requestCanceller() noexcept WARN_UNUSED_RESULT {
+		return [this](mtpRequestId requestId) {
+			request(requestId).cancel();
+		};
+	}
+
 	void requestSendDelayed() {
 		MainInstance()->sendAnything();
 	}
@@ -292,7 +298,7 @@ public:
 			request.handled();
 		}
 	}
-	gsl::not_null<Instance*> requestMTP() const {
+	not_null<Instance*> requestMTP() const {
 		return MainInstance();
 	}
 
@@ -347,17 +353,17 @@ private:
 	friend class RequestWrap;
 	friend class SentRequestWrap;
 
-	void requestRegister(mtpRequestId requestId) {
+	void senderRequestRegister(mtpRequestId requestId) {
 		_requests.emplace(MainInstance(), requestId);
 	}
-	void requestHandled(mtpRequestId requestId) {
+	void senderRequestHandled(mtpRequestId requestId) {
 		auto it = _requests.find(requestId);
 		if (it != _requests.cend()) {
 			it->handled();
 			_requests.erase(it);
 		}
 	}
-	void requestCancel(mtpRequestId requestId) {
+	void senderRequestCancel(mtpRequestId requestId) {
 		auto it = _requests.find(requestId);
 		if (it != _requests.cend()) {
 			_requests.erase(it);

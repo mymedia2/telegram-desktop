@@ -88,7 +88,6 @@ public:
 	void setSelectMode(bool enabled);
 
 	void mediaOverviewUpdated();
-	void changingMsgId(HistoryItem *row, MsgId newId);
 	void repaintItem(const HistoryItem *msg);
 
 	Window::TopBarWidget::SelectedState getSelectionState() const;
@@ -144,6 +143,7 @@ private:
 
 	void itemRemoved(HistoryItem *item);
 	MsgId complexMsgId(const HistoryItem *item) const;
+	void changingMsgId(HistoryItem *row, MsgId newId);
 
 	bool itemMigrated(MsgId msgId) const;
 	ChannelId itemChannel(MsgId msgId) const;
@@ -177,7 +177,8 @@ private:
 	PeerData *_peer;
 	MediaOverviewType _type;
 	bool _reversed;
-	History *_migrated, *_history;
+	History *_history;
+	History *_migrated;
 	ChannelId _channel;
 
 	bool _selMode = false;
@@ -210,7 +211,7 @@ private:
 	bool _searchFull = false;
 	bool _searchFullMigrated = false;
 	mtpRequestId _searchRequest = 0;
-	History::MediaOverview _searchResults;
+	QList<MsgId> _searchResults;
 	MsgId _lastSearchId = 0;
 	MsgId _lastSearchMigratedId = 0;
 	int _searchedCount = 0;
@@ -289,7 +290,7 @@ class OverviewWidget : public Window::AbstractSectionWidget, public RPCSender {
 	Q_OBJECT
 
 public:
-	OverviewWidget(QWidget *parent, gsl::not_null<Window::Controller*> controller, PeerData *peer, MediaOverviewType type);
+	OverviewWidget(QWidget *parent, not_null<Window::Controller*> controller, PeerData *peer, MediaOverviewType type);
 
 	void clear();
 
@@ -320,7 +321,6 @@ public:
 	void doneShow();
 
 	void mediaOverviewUpdated(const Notify::PeerUpdate &update);
-	void changingMsgId(HistoryItem *row, MsgId newId);
 	void itemRemoved(HistoryItem *item);
 
 	QPoint clampMousePosition(QPoint point);
@@ -352,7 +352,7 @@ public:
 	bool wheelEventFromFloatPlayer(QEvent *e, Window::Column myColumn, Window::Column playerColumn) override;
 	QRect rectForFloatPlayer(Window::Column myColumn, Window::Column playerColumn) override;
 
-	void ui_repaintHistoryItem(gsl::not_null<const HistoryItem*> item);
+	void ui_repaintHistoryItem(not_null<const HistoryItem*> item);
 
 	void notify_historyItemLayoutChanged(const HistoryItem *item);
 

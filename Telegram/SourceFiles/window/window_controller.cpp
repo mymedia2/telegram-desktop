@@ -42,8 +42,8 @@ void Controller::enableGifPauseReason(GifPauseReason reason) {
 
 void Controller::disableGifPauseReason(GifPauseReason reason) {
 	if (_gifPauseReasons & reason) {
-		_gifPauseReasons &= ~qFlags(reason);
-		if (static_cast<int>(_gifPauseReasons) < static_cast<int>(reason)) {
+		_gifPauseReasons &= ~reason;
+		if (_gifPauseReasons < reason) {
 			_gifPauseLevelChanged.notify();
 		}
 	}
@@ -136,7 +136,7 @@ void Controller::provideChatWidth(int requestedWidth) {
 	}
 }
 
-void Controller::showJumpToDate(gsl::not_null<PeerData*> peer, QDate requestedDate) {
+void Controller::showJumpToDate(not_null<PeerData*> peer, QDate requestedDate) {
 	Expects(peer != nullptr);
 	auto currentPeerDate = [peer] {
 		if (auto history = App::historyLoaded(peer)) {
@@ -177,7 +177,7 @@ void Controller::showJumpToDate(gsl::not_null<PeerData*> peer, QDate requestedDa
 	};
 	auto highlighted = requestedDate.isNull() ? currentPeerDate() : requestedDate;
 	auto month = highlighted;
-	auto box = Box<CalendarBox>(month, highlighted, [this, peer](const QDate &date) { AuthSession::Current().api().jumpToDate(peer, date); });
+	auto box = Box<CalendarBox>(month, highlighted, [this, peer](const QDate &date) { Auth().api().jumpToDate(peer, date); });
 	box->setMinDate(minPeerDate());
 	box->setMaxDate(maxPeerDate());
 	Ui::show(std::move(box));

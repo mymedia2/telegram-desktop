@@ -40,29 +40,29 @@ constexpr auto kServerConfigUpdateTimeoutMs = 24 * 3600 * TimeMs(1000);
 
 Instance::Instance() = default;
 
-void Instance::startOutgoingCall(gsl::not_null<UserData*> user) {
+void Instance::startOutgoingCall(not_null<UserData*> user) {
 	if (alreadyInCall()) { // Already in a call.
 		_currentCallPanel->showAndActivate();
 		return;
 	}
 	if (user->callsStatus() == UserData::CallsStatus::Private) {
 		// Request full user once more to refresh the setting in case it was changed.
-		AuthSession::Current().api().requestFullPeer(user);
+		Auth().api().requestFullPeer(user);
 		Ui::show(Box<InformBox>(lng_call_error_not_available(lt_user, App::peerName(user))));
 		return;
 	}
 	createCall(user, Call::Type::Outgoing);
 }
 
-void Instance::callFinished(gsl::not_null<Call*> call) {
+void Instance::callFinished(not_null<Call*> call) {
 	destroyCall(call);
 }
 
-void Instance::callFailed(gsl::not_null<Call*> call) {
+void Instance::callFailed(not_null<Call*> call) {
 	destroyCall(call);
 }
 
-void Instance::callRedial(gsl::not_null<Call*> call) {
+void Instance::callRedial(not_null<Call*> call) {
 	if (_currentCall.get() == call) {
 		refreshDhConfig();
 	}
@@ -73,7 +73,7 @@ void Instance::playSound(Sound sound) {
 	case Sound::Busy: {
 		if (!_callBusyTrack) {
 			_callBusyTrack = Media::Audio::Current().createTrack();
-			_callBusyTrack->fillFromFile(AuthSession::Current().data().getSoundPath(qsl("call_busy")));
+			_callBusyTrack->fillFromFile(Auth().data().getSoundPath(qsl("call_busy")));
 		}
 		_callBusyTrack->playOnce();
 	} break;
@@ -81,7 +81,7 @@ void Instance::playSound(Sound sound) {
 	case Sound::Ended: {
 		if (!_callEndedTrack) {
 			_callEndedTrack = Media::Audio::Current().createTrack();
-			_callEndedTrack->fillFromFile(AuthSession::Current().data().getSoundPath(qsl("call_end")));
+			_callEndedTrack->fillFromFile(Auth().data().getSoundPath(qsl("call_end")));
 		}
 		_callEndedTrack->playOnce();
 	} break;
@@ -89,14 +89,14 @@ void Instance::playSound(Sound sound) {
 	case Sound::Connecting: {
 		if (!_callConnectingTrack) {
 			_callConnectingTrack = Media::Audio::Current().createTrack();
-			_callConnectingTrack->fillFromFile(AuthSession::Current().data().getSoundPath(qsl("call_connect")));
+			_callConnectingTrack->fillFromFile(Auth().data().getSoundPath(qsl("call_connect")));
 		}
 		_callConnectingTrack->playOnce();
 	} break;
 	}
 }
 
-void Instance::destroyCall(gsl::not_null<Call*> call) {
+void Instance::destroyCall(not_null<Call*> call) {
 	if (_currentCall.get() == call) {
 		destroyCurrentPanel();
 		_currentCall.reset();
@@ -117,7 +117,7 @@ void Instance::destroyCurrentPanel() {
 	_pendingPanels.back()->hideAndDestroy(); // Always queues the destruction.
 }
 
-void Instance::createCall(gsl::not_null<UserData*> user, Call::Type type) {
+void Instance::createCall(not_null<UserData*> user, Call::Type type) {
 	auto call = std::make_unique<Call>(getCallDelegate(), user, type);;
 	if (_currentCall) {
 		_currentCallPanel->replaceCall(call.get());
@@ -134,7 +134,7 @@ void Instance::createCall(gsl::not_null<UserData*> user, Call::Type type) {
 
 void Instance::refreshDhConfig() {
 	Expects(_currentCall != nullptr);
-	request(MTPmessages_GetDhConfig(MTP_int(_dhConfig.version), MTP_int(Call::kRandomPowerSize))).done([this, call = base::weak_unique_ptr<Call>(_currentCall)](const MTPmessages_DhConfig &result) {
+	request(MTPmessages_GetDhConfig(MTP_int(_dhConfig.version), MTP_int(Call::kRandomPowerSize))).done([this, call = base::make_weak_unique(_currentCall)](const MTPmessages_DhConfig &result) {
 		auto random = base::const_byte_span();
 		switch (result.type()) {
 		case mtpc_messages_dhConfig: {
@@ -170,7 +170,7 @@ void Instance::refreshDhConfig() {
 		if (call) {
 			call->start(random);
 		}
-	}).fail([this, call = base::weak_unique_ptr<Call>(_currentCall)](const RPCError &error) {
+	}).fail([this, call = base::make_weak_unique(_currentCall)](const RPCError &error) {
 		if (!call) {
 			DEBUG_LOG(("API Warning: call was destroyed before got dhConfig."));
 			return;
@@ -246,7 +246,7 @@ void Instance::handleUpdate(const MTPDupdatePhoneCall& update) {
 	handleCallUpdate(update.vphone_call);
 }
 
-void Instance::showInfoPanel(gsl::not_null<Call*> call) {
+void Instance::showInfoPanel(not_null<Call*> call) {
 	if (_currentCall.get() == call) {
 		_currentCallPanel->showAndActivate();
 	}
@@ -299,7 +299,7 @@ Instance::~Instance() {
 }
 
 Instance &Current() {
-	return AuthSession::Current().calls();
+	return Auth().calls();
 }
 
 } // namespace Calls

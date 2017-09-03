@@ -20,6 +20,8 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 */
 #pragma once
 
+#include "base/flags.h"
+
 namespace Window {
 
 enum class GifPauseReason {
@@ -30,8 +32,8 @@ enum class GifPauseReason {
 	RoundPlaying = (1 << 3),
 	MediaPreview = (1 << 4),
 };
-Q_DECLARE_FLAGS(GifPauseReasons, GifPauseReason);
-Q_DECLARE_OPERATORS_FOR_FLAGS(GifPauseReasons);
+using GifPauseReasons = base::flags<GifPauseReason>;
+inline constexpr bool is_flag_type(GifPauseReason) { return true; };
 
 class MainWindow;
 
@@ -39,10 +41,10 @@ class Controller {
 public:
 	static constexpr auto kDefaultDialogsWidthRatio = 5. / 14;
 
-	Controller(gsl::not_null<MainWindow*> window) : _window(window) {
+	Controller(not_null<MainWindow*> window) : _window(window) {
 	}
 
-	gsl::not_null<MainWindow*> window() const {
+	not_null<MainWindow*> window() const {
 		return _window;
 	}
 
@@ -80,7 +82,7 @@ public:
 	bool canProvideChatWidth(int requestedWidth) const;
 	void provideChatWidth(int requestedWidth);
 
-	void showJumpToDate(gsl::not_null<PeerData*> peer, QDate requestedDate);
+	void showJumpToDate(not_null<PeerData*> peer, QDate requestedDate);
 
 	base::Variable<float64> &dialogsWidthRatio() {
 		return _dialogsWidthRatio;
@@ -102,12 +104,12 @@ public:
 	}
 
 private:
-	gsl::not_null<MainWindow*> _window;
+	not_null<MainWindow*> _window;
 
 	base::Observable<PeerData*> _searchInPeerChanged;
 	base::Observable<PeerData*> _historyPeerChanged;
 
-	GifPauseReasons _gifPauseReasons = { 0 };
+	GifPauseReasons _gifPauseReasons = 0;
 	base::Observable<void> _gifPauseLevelChanged;
 	base::Observable<void> _floatPlayerAreaUpdated;
 

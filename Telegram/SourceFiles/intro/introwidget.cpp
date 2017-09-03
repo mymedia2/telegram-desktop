@@ -163,7 +163,7 @@ void Widget::setInnerFocus() {
 void Widget::historyMove(Direction direction) {
 	if (getStep()->animating()) return;
 
-	t_assert(_stepHistory.size() > 1);
+	Assert(_stepHistory.size() > 1);
 
 	auto wasStep = getStep((direction == Direction::Back) ? 0 : 1);
 	if (direction == Direction::Back) {
@@ -457,10 +457,10 @@ void Widget::Step::finish(const MTPUser &user, QImage photo) {
 
 	// "this" is already deleted here by creating the main widget.
 	if (auto user = App::self()) {
-		App::api()->requestFullPeer(user);
+		Auth().api().requestFullPeer(user);
 	}
 	if (!photo.isNull()) {
-		App::app()->uploadProfilePhoto(photo, AuthSession::CurrentUserId());
+		Messenger::Instance().uploadProfilePhoto(photo, Auth().userId());
 	}
 }
 
@@ -538,12 +538,11 @@ bool Widget::Step::paintAnimated(Painter &p, QRect clip) {
 		return true;
 	}
 
-	auto guard = base::scope_guard([this, &p] {
-		if (hasCover()) paintCover(p, 0);
-	});
-
 	auto dt = _a_show.current(getms(), 1.);
 	if (!_a_show.animating()) {
+		if (hasCover()) {
+			paintCover(p, 0);
+		}
 		if (_coverAnimation.title) {
 			showFinished();
 		}
@@ -561,7 +560,6 @@ bool Widget::Step::paintAnimated(Painter &p, QRect clip) {
 	auto coverTop = (hasCover() ? anim::interpolate(-st::introCoverHeight, 0, showCoverMethod) : anim::interpolate(0, -st::introCoverHeight, hideCoverMethod));
 
 	paintCover(p, coverTop);
-	guard.dismiss();
 
 	auto positionReady = hasCover() ? showCoverMethod : hideCoverMethod;
 	_coverAnimation.title->paintFrame(p, positionReady, departingAlpha, arrivingAlpha);
@@ -616,9 +614,9 @@ void Widget::Step::prepareCoverMask() {
 	auto maskHeight = st::introCoverHeight * cIntRetinaFactor();
 	auto mask = QImage(maskWidth, maskHeight, QImage::Format_ARGB32_Premultiplied);
 	auto maskInts = reinterpret_cast<uint32*>(mask.bits());
-	t_assert(mask.depth() == (sizeof(uint32) << 3));
+	Assert(mask.depth() == (sizeof(uint32) << 3));
 	auto maskIntsPerLineAdded = (mask.bytesPerLine() >> 2) - maskWidth;
-	t_assert(maskIntsPerLineAdded >= 0);
+	Assert(maskIntsPerLineAdded >= 0);
 	auto realHeight = static_cast<float64>(maskHeight - 1);
 	for (auto y = 0; y != maskHeight; ++y) {
 		auto color = anim::color(st::introCoverTopBg, st::introCoverBottomBg, y / realHeight);

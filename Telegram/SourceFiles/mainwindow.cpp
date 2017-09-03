@@ -39,7 +39,6 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "mainwidget.h"
 #include "layerwidget.h"
 #include "boxes/confirm_box.h"
-#include "boxes/contacts_box.h"
 #include "boxes/add_contact_box.h"
 #include "boxes/connection_box.h"
 #include "observer_peer.h"
@@ -181,8 +180,6 @@ void MainWindow::firstShow() {
 
 	psFirstShow();
 	updateTrayMenu();
-
-	createMediaView();
 }
 
 void MainWindow::clearWidgetsHook() {
@@ -216,7 +213,7 @@ void MainWindow::clearPasscode() {
 	if (_intro) {
 		_intro->showAnimated(bg, true);
 	} else {
-		t_assert(_main != nullptr);
+		Assert(_main != nullptr);
 		_main->showAnimated(bg, true);
 		Messenger::Instance().checkStartUrl();
 	}
@@ -229,7 +226,7 @@ void MainWindow::setupPasscode() {
 	updateControlsGeometry();
 
 	if (_main) _main->hide();
-	hideMediaview();
+	Messenger::Instance().hideMediaView();
 	Ui::hideSettingsAndLayer(true);
 	if (_intro) _intro->hide();
 	if (animated) {
@@ -270,7 +267,7 @@ void MainWindow::setupIntro() {
 
 void MainWindow::serviceNotification(const TextWithEntities &message, const MTPMessageMedia &media, int32 date, bool force) {
 	if (date <= 0) date = unixtime();
-	auto h = (_main && App::userLoaded(ServiceUserId)) ? App::history(ServiceUserId) : nullptr;
+	auto h = (_main && App::userLoaded(ServiceUserId)) ? App::history(ServiceUserId).get() : nullptr;
 	if (!h || (!force && h->isEmpty())) {
 		_delayedServiceMsgs.push_back(DelayedServiceMsg(message, media, date));
 		return sendServiceHistoryRequest();
@@ -302,7 +299,7 @@ void MainWindow::setupMain(const MTPUser *self) {
 
 	clearWidgets();
 
-	t_assert(AuthSession::Exists());
+	Assert(AuthSession::Exists());
 
 	_main.create(bodyWidget(), controller());
 	_main->show();
@@ -363,7 +360,7 @@ void MainWindow::destroyLayerDelayed() {
 void MainWindow::ui_hideSettingsAndLayer(ShowLayerOptions options) {
 	if (_layerBg) {
 		_layerBg->hideAll();
-		if (options.testFlag(ForceFastShowLayer)) {
+		if (options & ForceFastShowLayer) {
 			destroyLayerDelayed();
 		}
 	}
@@ -402,8 +399,8 @@ PasscodeWidget *MainWindow::passcodeWidget() {
 void MainWindow::ui_showBox(object_ptr<BoxContent> box, ShowLayerOptions options) {
 	if (box) {
 		ensureLayerCreated();
-		if (options.testFlag(KeepOtherLayers)) {
-			if (options.testFlag(ShowAfterOtherLayers)) {
+		if (options & KeepOtherLayers) {
+			if (options & ShowAfterOtherLayers) {
 				_layerBg->prependBox(std::move(box));
 			} else {
 				_layerBg->appendBox(std::move(box));
@@ -411,17 +408,17 @@ void MainWindow::ui_showBox(object_ptr<BoxContent> box, ShowLayerOptions options
 		} else {
 			_layerBg->showBox(std::move(box));
 		}
-		if (options.testFlag(ForceFastShowLayer)) {
+		if (options & ForceFastShowLayer) {
 			_layerBg->finishAnimation();
 		}
 	} else {
 		if (_layerBg) {
 			_layerBg->hideTopLayer();
-			if (options.testFlag(ForceFastShowLayer) && !_layerBg->layerShown()) {
+			if ((options & ForceFastShowLayer) && !_layerBg->layerShown()) {
 				destroyLayerDelayed();
 			}
 		}
-		hideMediaview();
+		Messenger::Instance().hideMediaView();
 	}
 }
 
@@ -458,15 +455,6 @@ void MainWindow::ui_showMediaPreview(PhotoData *photo) {
 void MainWindow::ui_hideMediaPreview() {
 	if (!_mediaPreview) return;
 	_mediaPreview->hidePreview();
-}
-
-PeerData *MainWindow::ui_getPeerForMouseAction() {
-	if (Ui::isMediaViewShown()) {
-		return Platform::MainWindow::ui_getPeerForMouseAction();
-	} else if (_main) {
-		return _main->ui_getPeerForMouseAction();
-	}
-	return nullptr;
 }
 
 void MainWindow::showConnecting(const QString &text, const QString &reconnect) {
@@ -527,6 +515,11 @@ bool MainWindow::doWeReadServerHistory() {
 	return isActive() && _main && !Ui::isLayerShown() && _main->doWeReadServerHistory();
 }
 
+bool MainWindow::doWeReadMentions() {
+	updateIsActive(0);
+	return isActive() && _main && !Ui::isLayerShown() && _main->doWeReadMentions();
+}
+
 void MainWindow::checkHistoryActivation() {
 	if (_main && doWeReadServerHistory()) {
 		_main->markActiveHistoryAsRead();
@@ -555,74 +548,47 @@ void MainWindow::setInnerFocus() {
 
 bool MainWindow::eventFilter(QObject *object, QEvent *e) {
 	switch (e->type()) {
-	case QEvent::KeyPress:
+	case QEvent::KeyPress: {
 		if (cDebug() && e->type() == QEvent::KeyPress && object == windowHandle()) {
 			auto key = static_cast<QKeyEvent*>(e)->key();
 			FeedLangTestingKey(key);
 		}
-		// [[fallthrough]];
-	case QEvent::MouseButtonPress:
-	case QEvent::TouchBegin:
-	case QEvent::Wheel:
-		psUserActionDone();
-		break;
+	} break;
 
-	case QEvent::MouseMove:
+	case QEvent::MouseMove: {
 		if (_main && _main->isIdle()) {
 			psUserActionDone();
 			_main->checkIdleFinish();
 		}
-		break;
+	} break;
 
-	case QEvent::MouseButtonRelease:
+	case QEvent::MouseButtonRelease: {
 		Ui::hideMediaPreview();
-		break;
+	} break;
 
-	case QEvent::ShortcutOverride: // handle shortcuts ourselves
-		return true;
-
-	case QEvent::Shortcut:
-		DEBUG_LOG(("Shortcut event caught: %1").arg(static_cast<QShortcutEvent*>(e)->key().toString()));
-		if (Shortcuts::launch(static_cast<QShortcutEvent*>(e)->shortcutId())) {
-			return true;
-		}
-		break;
-
-	case QEvent::ApplicationActivate:
+	case QEvent::ApplicationActivate: {
 		if (object == QCoreApplication::instance()) {
-			psUserActionDone();
-			App::CallDelayed(1, this, [this] {
+			InvokeQueued(this, [this] {
 				handleActiveChanged();
 			});
 		}
-		break;
+	} break;
 
-	case QEvent::FileOpen:
-		if (object == QCoreApplication::instance()) {
-			QString url = static_cast<QFileOpenEvent*>(e)->url().toEncoded().trimmed();
-			if (url.startsWith(qstr("tg://"), Qt::CaseInsensitive)) {
-				cSetStartUrl(url.mid(0, 8192));
-				Messenger::Instance().checkStartUrl();
-			}
-			activate();
-		}
-		break;
-
-	case QEvent::WindowStateChange:
+	case QEvent::WindowStateChange: {
 		if (object == this) {
 			auto state = (windowState() & Qt::WindowMinimized) ? Qt::WindowMinimized :
 				((windowState() & Qt::WindowMaximized) ? Qt::WindowMaximized :
 				((windowState() & Qt::WindowFullScreen) ? Qt::WindowFullScreen : Qt::WindowNoState));
 			handleStateChanged(state);
 		}
-		break;
+	} break;
 
 	case QEvent::Move:
-	case QEvent::Resize:
+	case QEvent::Resize: {
 		if (object == this) {
 			positionUpdated();
 		}
-		break;
+	} break;
 	}
 
 	return Platform::MainWindow::eventFilter(object, e);
@@ -732,9 +698,10 @@ void MainWindow::noLayerStack(LayerStackWidget *was) {
 
 void MainWindow::layerFinishedHide(LayerStackWidget *was) {
 	if (was == _layerBg) {
+		auto resetFocus = (was == App::wnd()->focusWidget());
 		destroyLayerDelayed();
-		InvokeQueued(this, [this] {
-			setInnerFocus();
+		InvokeQueued(this, [this, resetFocus] {
+			if (resetFocus) setInnerFocus();
 			checkHistoryActivation();
 		});
 	}
@@ -801,9 +768,9 @@ void MainWindow::toggleDisplayNotifyFromTray() {
 		}
 	}
 	Local::writeUserSettings();
-	AuthSession::Current().notifications().settingsChanged().notify(Window::Notifications::ChangeType::DesktopEnabled);
+	Auth().notifications().settingsChanged().notify(Window::Notifications::ChangeType::DesktopEnabled);
 	if (soundNotifyChanged) {
-		AuthSession::Current().notifications().settingsChanged().notify(Window::Notifications::ChangeType::SoundEnabled);
+		Auth().notifications().settingsChanged().notify(Window::Notifications::ChangeType::SoundEnabled);
 	}
 }
 
@@ -813,7 +780,7 @@ void MainWindow::closeEvent(QCloseEvent *e) {
 		App::quit();
 	} else {
 		e->ignore();
-		if (!AuthSession::Exists() || !Ui::hideWindowNoQuit()) {
+		if (!AuthSession::Exists() || !hideNoQuit()) {
 			App::quit();
 		}
 	}
@@ -989,16 +956,11 @@ QImage MainWindow::iconWithCounter(int size, int count, style::color bg, style::
 
 void MainWindow::sendPaths() {
 	if (App::passcoded()) return;
-	hideMediaview();
+	Messenger::Instance().hideMediaView();
 	Ui::hideSettingsAndLayer(true);
 	if (_main) {
 		_main->activate();
 	}
-}
-
-void MainWindow::changingMsgId(HistoryItem *row, MsgId newId) {
-	if (_main) _main->changingMsgId(row, newId);
-	Platform::MainWindow::changingMsgId(row, newId);
 }
 
 void MainWindow::updateIsActiveHook() {

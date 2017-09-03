@@ -158,10 +158,10 @@ private:
 			}
 		}
 
-		QFlags<QIODevice::OpenModeFlag> mode = QIODevice::WriteOnly | QIODevice::Text;
+		auto mode = QIODevice::WriteOnly | QIODevice::Text;
 		if (type == LogDataMain) { // we can call LOG() in LogDataMain reopen - mutex not locked
 			if (postfix.isEmpty()) { // instance checked, need to move to log.txt
-				t_assert(!files[type]->fileName().isEmpty()); // one of log_startXX.txt should've been opened already
+				Assert(!files[type]->fileName().isEmpty()); // one of log_startXX.txt should've been opened already
 
 				QSharedPointer<QFile> to(new QFile(_logsFilePath(type, postfix)));
 				if (to->exists() && !to->remove()) {
@@ -301,7 +301,7 @@ namespace SignalHandlers {
 namespace Logs {
 
 	void start() {
-		t_assert(LogsData == 0);
+		Assert(LogsData == 0);
 
 		if (!Sandbox::CheckBetaVersionDir()) {
 			return;
@@ -369,7 +369,7 @@ namespace Logs {
 		LOG(("Executable dir: %1, name: %2").arg(cExeDir()).arg(cExeName()));
 		LOG(("Initial working dir: %1").arg(initialWorkingDir));
 		LOG(("Working dir: %1").arg(cWorkingDir()));
-		LOG(("Arguments: %1").arg(cArguments()));
+		LOG(("Command line: %1").arg(cArguments()));
 
 		if (!LogsData) {
 			LOG(("FATAL: Could not open '%1' for writing log!").arg(_logsFilePath(LogDataMain, qsl("_startXX"))));
@@ -386,12 +386,11 @@ namespace Logs {
 		}
 
 		if (LogsInMemory) {
-			t_assert(LogsInMemory != DeletedLogsInMemory);
+			Assert(LogsInMemory != DeletedLogsInMemory);
 			LogsInMemoryList list = *LogsInMemory;
 			for (LogsInMemoryList::const_iterator i = list.cbegin(), e = list.cend(); i != e; ++i) {
 				if (i->first == LogDataMain) {
 					_logsWrite(i->first, i->second);
-					LOG(("First: %1, %2").arg(i->first).arg(i->second));
 				}
 			}
 		}
@@ -430,7 +429,7 @@ namespace Logs {
 		}
 
 		if (LogsInMemory) {
-			t_assert(LogsInMemory != DeletedLogsInMemory);
+			Assert(LogsInMemory != DeletedLogsInMemory);
 			LogsInMemoryList list = *LogsInMemory;
 			for (LogsInMemoryList::const_iterator i = list.cbegin(), e = list.cend(); i != e; ++i) {
 				if (i->first != LogDataMain) {
@@ -439,7 +438,7 @@ namespace Logs {
 			}
 		}
 		if (LogsInMemory) {
-			t_assert(LogsInMemory != DeletedLogsInMemory);
+			Assert(LogsInMemory != DeletedLogsInMemory);
 			delete LogsInMemory;
 		}
 		LogsInMemory = DeletedLogsInMemory;
@@ -451,7 +450,7 @@ namespace Logs {
 
 	void multipleInstances() {
 		if (LogsInMemory) {
-			t_assert(LogsInMemory != DeletedLogsInMemory);
+			Assert(LogsInMemory != DeletedLogsInMemory);
 			delete LogsInMemory;
 		}
 		LogsInMemory = DeletedLogsInMemory;

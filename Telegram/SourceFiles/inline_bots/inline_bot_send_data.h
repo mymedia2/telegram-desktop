@@ -22,7 +22,6 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 
 #include "core/basic_types.h"
 #include "structs.h"
-#include "mtproto/core_types.h"
 #include "history/history_location_manager.h"
 
 namespace InlineBots {
@@ -115,7 +114,7 @@ public:
 		return true;
 	}
 	bool getLocationCoords(LocationCoords *outLocation) const override {
-		t_assert(outLocation != nullptr);
+		Assert(outLocation != nullptr);
 		*outLocation = _location;
 		return true;
 	}
@@ -147,7 +146,7 @@ public:
 		return true;
 	}
 	bool getLocationCoords(LocationCoords *outLocation) const override {
-		t_assert(outLocation != nullptr);
+		Assert(outLocation != nullptr);
 		*outLocation = _location;
 		return true;
 	}

@@ -51,7 +51,7 @@ QString getButtonText(MediaOverviewType type, int count) {
 
 SharedMediaWidget::SharedMediaWidget(QWidget *parent, PeerData *peer) : BlockWidget(parent, peer, lang(lng_profile_shared_media))
 , _history(App::history(peer))
-, _migrated(peer->migrateFrom() ? App::history(peer->migrateFrom()) : nullptr) {
+, _migrated(_history->migrateFrom()) {
 	auto observeEvents = Notify::PeerUpdate::Flag::SharedMediaChanged
 		| Notify::PeerUpdate::Flag::UserCommonChatsChanged;
 	subscribe(Notify::PeerUpdated(), Notify::PeerUpdatedHandler(observeEvents, [this](const Notify::PeerUpdate &update) {
@@ -151,7 +151,7 @@ void SharedMediaWidget::onMediaChosen() {
 }
 
 void SharedMediaWidget::resizeButtons(int newWidth, int *top) {
-	t_assert(top != nullptr);
+	Assert(top != nullptr);
 
 	int left = defaultOutlineButtonLeft();
 	int availableWidth = newWidth - left - st::profileBlockMarginRight;

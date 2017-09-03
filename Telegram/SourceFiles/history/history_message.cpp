@@ -37,6 +37,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "styles/style_widgets.h"
 #include "styles/style_history.h"
 #include "window/notifications_manager.h"
+#include "observer_peer.h"
 
 namespace {
 
@@ -77,7 +78,7 @@ style::color fromNameFgSelected(int index) {
 	return colors[index];
 }
 
-MTPDmessage::Flags NewForwardedFlags(gsl::not_null<PeerData*> peer, UserId from, gsl::not_null<HistoryMessage*> fwd) {
+MTPDmessage::Flags NewForwardedFlags(not_null<PeerData*> peer, UserId from, not_null<HistoryMessage*> fwd) {
 	auto result = NewMessageFlags(peer) | MTPDmessage::Flag::f_fwd_from;
 	if (from) {
 		result |= MTPDmessage::Flag::f_from_id;
@@ -169,7 +170,7 @@ bool HasInlineItems(const SelectedItemSet &items) {
 
 } // namespace
 
-void FastShareMessage(gsl::not_null<HistoryItem*> item) {
+void FastShareMessage(not_null<HistoryItem*> item) {
 	struct ShareData {
 		ShareData(const FullMsgId &msgId) : msgId(msgId) {
 		}
@@ -290,7 +291,7 @@ base::lambda<void(ChannelData*, MsgId)> HistoryDependentItemCallback(const FullM
 	};
 }
 
-MTPDmessage::Flags NewMessageFlags(gsl::not_null<PeerData*> peer) {
+MTPDmessage::Flags NewMessageFlags(not_null<PeerData*> peer) {
 	MTPDmessage::Flags result = 0;
 	if (!peer->isSelf()) {
 		result |= MTPDmessage::Flag::f_out;
@@ -301,7 +302,7 @@ MTPDmessage::Flags NewMessageFlags(gsl::not_null<PeerData*> peer) {
 	return result;
 }
 
-QString GetErrorTextForForward(gsl::not_null<PeerData*> peer, const SelectedItemSet &items) {
+QString GetErrorTextForForward(not_null<PeerData*> peer, const SelectedItemSet &items) {
 	if (!peer->canWrite()) {
 		return lang(lng_forward_cant);
 	}
@@ -485,11 +486,11 @@ void HistoryMessageReply::itemRemoved(HistoryMessage *holder, HistoryItem *remov
 }
 
 void HistoryMessageReply::paint(Painter &p, const HistoryItem *holder, int x, int y, int w, PaintFlags flags) const {
-	bool selected = (flags & PaintSelected), outbg = holder->hasOutLayout();
+	bool selected = (flags & PaintFlag::Selected), outbg = holder->hasOutLayout();
 
 	style::color bar = st::msgImgReplyBarColor;
-	if (flags & PaintInBubble) {
-		bar = (flags & PaintSelected) ? (outbg ? st::msgOutReplyBarSelColor : st::msgInReplyBarSelColor) : (outbg ? st::msgOutReplyBarColor : st::msgInReplyBarColor);
+	if (flags & PaintFlag::InBubble) {
+		bar = (flags & PaintFlag::Selected) ? (outbg ? st::msgOutReplyBarSelColor : st::msgInReplyBarSelColor) : (outbg ? st::msgOutReplyBarColor : st::msgInReplyBarColor);
 	}
 	QRect rbar(rtlrect(x + st::msgReplyBarPos.x(), y + st::msgReplyPadding.top() + st::msgReplyBarPos.y(), st::msgReplyBarSize.width(), st::msgReplyBarSize.height(), w + 2 * x));
 	p.fillRect(rbar, bar);
@@ -513,7 +514,7 @@ void HistoryMessageReply::paint(Painter &p, const HistoryItem *holder, int x, in
 				}
 			}
 			if (w > st::msgReplyBarSkip + previewSkip) {
-				if (flags & PaintInBubble) {
+				if (flags & PaintFlag::InBubble) {
 					p.setPen(selected ? (outbg ? st::msgOutServiceFgSelected : st::msgInServiceFgSelected) : (outbg ? st::msgOutServiceFg : st::msgInServiceFg));
 				} else {
 					p.setPen(st::msgImgReplyBarColor);
@@ -525,7 +526,7 @@ void HistoryMessageReply::paint(Painter &p, const HistoryItem *holder, int x, in
 				}
 
 				auto replyToAsMsg = replyToMsg->toHistoryMessage();
-				if (!(flags & PaintInBubble)) {
+				if (!(flags & PaintFlag::InBubble)) {
 				} else if ((replyToAsMsg && replyToAsMsg->emptyText()) || replyToMsg->serviceMsg()) {
 					p.setPen(outbg ? (selected ? st::msgOutDateFgSelected : st::msgOutDateFg) : (selected ? st::msgInDateFgSelected : st::msgInDateFg));
 				} else {
@@ -536,7 +537,7 @@ void HistoryMessageReply::paint(Painter &p, const HistoryItem *holder, int x, in
 		} else {
 			p.setFont(st::msgDateFont);
 			auto &date = outbg ? (selected ? st::msgOutDateFgSelected : st::msgOutDateFg) : (selected ? st::msgInDateFgSelected : st::msgInDateFg);
-			p.setPen((flags & PaintInBubble) ? date : st::msgDateImgFg);
+			p.setPen((flags & PaintFlag::InBubble) ? date : st::msgDateImgFg);
 			p.drawTextLeft(x + st::msgReplyBarSkip, y + st::msgReplyPadding.top() + (st::msgReplyBarSize.height() - st::msgDateFont->height) / 2, w + 2 * x, st::msgDateFont->elided(lang(replyToMsgId ? lng_profile_loading : lng_deleted_message), w - st::msgReplyBarSkip));
 		}
 	}
@@ -550,7 +551,7 @@ const style::TextStyle &HistoryMessage::KeyboardStyle::textStyle() const {
 	return st::serviceTextStyle;
 }
 
-void HistoryMessage::KeyboardStyle::repaint(gsl::not_null<const HistoryItem*> item) const {
+void HistoryMessage::KeyboardStyle::repaint(not_null<const HistoryItem*> item) const {
 	Ui::repaintHistoryItem(item);
 }
 
@@ -604,7 +605,7 @@ int HistoryMessage::KeyboardStyle::minButtonWidth(HistoryMessageReplyMarkup::But
 	return result;
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, const MTPDmessage &msg)
+HistoryMessage::HistoryMessage(not_null<History*> history, const MTPDmessage &msg)
 : HistoryItem(history, msg.vid.v, msg.vflags.v, ::date(msg.vdate), msg.has_from_id() ? msg.vfrom_id.v : 0) {
 	CreateConfig config;
 
@@ -633,7 +634,7 @@ HistoryMessage::HistoryMessage(gsl::not_null<History*> history, const MTPDmessag
 	setText({ text, entities });
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, const MTPDmessageService &msg)
+HistoryMessage::HistoryMessage(not_null<History*> history, const MTPDmessageService &msg)
 : HistoryItem(history, msg.vid.v, mtpCastFlags(msg.vflags.v), ::date(msg.vdate), msg.has_from_id() ? msg.vfrom_id.v : 0) {
 	CreateConfig config;
 
@@ -652,7 +653,7 @@ HistoryMessage::HistoryMessage(gsl::not_null<History*> history, const MTPDmessag
 	setText(TextWithEntities {});
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId id, MTPDmessage::Flags flags, QDateTime date, UserId from, const QString &postAuthor, gsl::not_null<HistoryMessage*> fwd)
+HistoryMessage::HistoryMessage(not_null<History*> history, MsgId id, MTPDmessage::Flags flags, QDateTime date, UserId from, const QString &postAuthor, not_null<HistoryMessage*> fwd)
 : HistoryItem(history, id, NewForwardedFlags(history->peer, from, fwd) | flags, date, from) {
 	CreateConfig config;
 
@@ -703,14 +704,14 @@ HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId id, MTPDme
 	setText(fwd->originalText());
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId id, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, const TextWithEntities &textWithEntities)
+HistoryMessage::HistoryMessage(not_null<History*> history, MsgId id, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, const TextWithEntities &textWithEntities)
 	: HistoryItem(history, id, flags, date, (flags & MTPDmessage::Flag::f_from_id) ? from : 0) {
 	createComponentsHelper(flags, replyTo, viaBotId, postAuthor, MTPnullMarkup);
 
 	setText(textWithEntities);
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, DocumentData *doc, const QString &caption, const MTPReplyMarkup &markup)
+HistoryMessage::HistoryMessage(not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, DocumentData *doc, const QString &caption, const MTPReplyMarkup &markup)
 	: HistoryItem(history, msgId, flags, date, (flags & MTPDmessage::Flag::f_from_id) ? from : 0) {
 	createComponentsHelper(flags, replyTo, viaBotId, postAuthor, markup);
 
@@ -718,7 +719,7 @@ HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId msgId, MTP
 	setText(TextWithEntities());
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, PhotoData *photo, const QString &caption, const MTPReplyMarkup &markup)
+HistoryMessage::HistoryMessage(not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, PhotoData *photo, const QString &caption, const MTPReplyMarkup &markup)
 	: HistoryItem(history, msgId, flags, date, (flags & MTPDmessage::Flag::f_from_id) ? from : 0) {
 	createComponentsHelper(flags, replyTo, viaBotId, postAuthor, markup);
 
@@ -726,7 +727,7 @@ HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId msgId, MTP
 	setText(TextWithEntities());
 }
 
-HistoryMessage::HistoryMessage(gsl::not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, GameData *game, const MTPReplyMarkup &markup)
+HistoryMessage::HistoryMessage(not_null<History*> history, MsgId msgId, MTPDmessage::Flags flags, MsgId replyTo, UserId viaBotId, QDateTime date, UserId from, const QString &postAuthor, GameData *game, const MTPReplyMarkup &markup)
 	: HistoryItem(history, msgId, flags, date, (flags & MTPDmessage::Flag::f_from_id) ? from : 0) {
 	createComponentsHelper(flags, replyTo, viaBotId, postAuthor, markup);
 
@@ -862,8 +863,8 @@ void HistoryMessage::createComponents(const CreateConfig &config) {
 
 	if (auto reply = Get<HistoryMessageReply>()) {
 		reply->replyToMsgId = config.replyTo;
-		if (!reply->updateData(this) && App::api()) {
-			App::api()->requestMessageData(history()->peer->asChannel(), reply->replyToMsgId, HistoryDependentItemCallback(fullId()));
+		if (!reply->updateData(this)) {
+			Auth().api().requestMessageData(history()->peer->asChannel(), reply->replyToMsgId, HistoryDependentItemCallback(fullId()));
 		}
 	}
 	if (auto via = Get<HistoryMessageVia>()) {
@@ -1276,6 +1277,11 @@ int32 HistoryMessage::addToOverview(AddToOverviewMethod method) {
 			result |= (1 << OverviewLinks);
 		}
 	}
+	if (mentionsMe() && isMediaUnread()) {
+		if (history()->addToUnreadMentions(id, method)) {
+			Notify::peerUpdatedDelayed(history()->peer, Notify::PeerUpdate::Flag::UnreadMentionsChanged);
+		}
+	}
 	return result;
 }
 
@@ -1285,6 +1291,9 @@ void HistoryMessage::eraseFromOverview() {
 	}
 	if (hasTextLinks()) {
 		history()->eraseFromOverview(OverviewLinks, id);
+	}
+	if (mentionsMe() && isMediaUnread()) {
+		history()->eraseFromUnreadMentions(id);
 	}
 }
 
@@ -1604,12 +1613,10 @@ void HistoryMessage::draw(Painter &p, QRect clip, TextSelection selection, TimeM
 		}
 	}
 
-	auto fullAnimMs = App::main() ? App::main()->animActiveTimeStart(this) : 0LL;
+	auto fullAnimMs = App::main() ? App::main()->highlightStartTime(this) : 0LL;
 	if (fullAnimMs > 0 && fullAnimMs <= ms) {
-		int animms = ms - fullAnimMs;
-		if (animms > st::activeFadeInDuration + st::activeFadeOutDuration) {
-			App::main()->stopAnimActive();
-		} else {
+		auto animms = ms - fullAnimMs;
+		if (animms < st::activeFadeInDuration + st::activeFadeOutDuration) {
 			auto top = marginTop();
 			auto bottom = marginBottom();
 			auto fill = qMin(top, bottom);
@@ -1776,9 +1783,9 @@ void HistoryMessage::paintReplyInfo(Painter &p, QRect &trect, bool selected) con
 	if (auto reply = Get<HistoryMessageReply>()) {
 		int32 h = st::msgReplyPadding.top() + st::msgReplyBarSize.height() + st::msgReplyPadding.bottom();
 
-		HistoryMessageReply::PaintFlags flags = HistoryMessageReply::PaintInBubble;
+		auto flags = HistoryMessageReply::PaintFlag::InBubble | 0;
 		if (selected) {
-			flags |= HistoryMessageReply::PaintSelected;
+			flags |= HistoryMessageReply::PaintFlag::Selected;
 		}
 		reply->paint(p, this, trect.x(), trect.y(), trect.width(), flags);
 

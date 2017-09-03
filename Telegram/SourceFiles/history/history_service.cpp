@@ -192,7 +192,7 @@ void HistoryService::setMessageByAction(const MTPmessageAction &action) {
 		if (auto channel = history()->peer->asMegagroup()) {
 			auto &users = action.c_messageActionChatAddUser().vusers;
 			for_const (auto &item, users.v) {
-				if (item.v == AuthSession::CurrentUserId()) {
+				if (item.v == Auth().userId()) {
 					channel->mgInfo->joinedMessageFound = true;
 					break;
 				}
@@ -229,7 +229,7 @@ void HistoryService::setSelfDestruct(HistoryServiceSelfDestruct::Type type, int 
 
 bool HistoryService::updateDependent(bool force) {
 	auto dependent = GetDependentData();
-	t_assert(dependent != nullptr);
+	Assert(dependent != nullptr);
 
 	if (!force) {
 		if (!dependent->msgId || dependent->msg) {
@@ -258,7 +258,7 @@ bool HistoryService::updateDependent(bool force) {
 		updateDependentText();
 	}
 	if (force && gotDependencyItem) {
-		AuthSession::Current().notifications().checkDelayed();
+		Auth().notifications().checkDelayed();
 	}
 	return (dependent->msg || !dependent->msgId);
 }
@@ -400,17 +400,17 @@ HistoryService::PreparedText HistoryService::preparePaymentSentText() {
 	return result;
 }
 
-HistoryService::HistoryService(gsl::not_null<History*> history, const MTPDmessage &message) :
+HistoryService::HistoryService(not_null<History*> history, const MTPDmessage &message) :
 	HistoryItem(history, message.vid.v, message.vflags.v, ::date(message.vdate), message.has_from_id() ? message.vfrom_id.v : 0) {
 	createFromMtp(message);
 }
 
-HistoryService::HistoryService(gsl::not_null<History*> history, const MTPDmessageService &message) :
+HistoryService::HistoryService(not_null<History*> history, const MTPDmessageService &message) :
 	HistoryItem(history, message.vid.v, mtpCastFlags(message.vflags.v), ::date(message.vdate), message.has_from_id() ? message.vfrom_id.v : 0) {
 	createFromMtp(message);
 }
 
-HistoryService::HistoryService(gsl::not_null<History*> history, MsgId msgId, QDateTime date, const PreparedText &message, MTPDmessage::Flags flags, int32 from, PhotoData *photo) :
+HistoryService::HistoryService(not_null<History*> history, MsgId msgId, QDateTime date, const PreparedText &message, MTPDmessage::Flags flags, int32 from, PhotoData *photo) :
 	HistoryItem(history, msgId, flags, date, from) {
 	setServiceText(message);
 	if (photo) {
@@ -626,7 +626,7 @@ void HistoryService::createFromMtp(const MTPDmessage &message) {
 	case mtpc_messageMediaPhoto: {
 		if (message.is_media_unread()) {
 			auto &photo = message.vmedia.c_messageMediaPhoto();
-			t_assert(photo.has_ttl_seconds());
+			Assert(photo.has_ttl_seconds());
 			setSelfDestruct(HistoryServiceSelfDestruct::Type::Photo, photo.vttl_seconds.v);
 			if (out()) {
 				setServiceText({ lang(lng_ttl_photo_sent) });
@@ -643,7 +643,7 @@ void HistoryService::createFromMtp(const MTPDmessage &message) {
 	case mtpc_messageMediaDocument: {
 		if (message.is_media_unread()) {
 			auto &document = message.vmedia.c_messageMediaDocument();
-			t_assert(document.has_ttl_seconds());
+			Assert(document.has_ttl_seconds());
 			setSelfDestruct(HistoryServiceSelfDestruct::Type::Video, document.vttl_seconds.v);
 			if (out()) {
 				setServiceText({ lang(lng_ttl_video_sent) });
@@ -678,8 +678,8 @@ void HistoryService::createFromMtp(const MTPDmessageService &message) {
 		}
 		if (auto dependent = GetDependentData()) {
 			dependent->msgId = message.vreply_to_msg_id.v;
-			if (!updateDependent() && App::api()) {
-				App::api()->requestMessageData(history()->peer->asChannel(), dependent->msgId, HistoryDependentItemCallback(fullId()));
+			if (!updateDependent()) {
+				Auth().api().requestMessageData(history()->peer->asChannel(), dependent->msgId, HistoryDependentItemCallback(fullId()));
 			}
 		}
 	}
@@ -772,12 +772,12 @@ HistoryService::~HistoryService() {
 	_media.reset();
 }
 
-HistoryJoined::HistoryJoined(gsl::not_null<History*> history, const QDateTime &inviteDate, gsl::not_null<UserData*> inviter, MTPDmessage::Flags flags)
+HistoryJoined::HistoryJoined(not_null<History*> history, const QDateTime &inviteDate, not_null<UserData*> inviter, MTPDmessage::Flags flags)
 	: HistoryService(history, clientMsgId(), inviteDate, GenerateText(history, inviter), flags) {
 }
 
-HistoryJoined::PreparedText HistoryJoined::GenerateText(gsl::not_null<History*> history, gsl::not_null<UserData*> inviter) {
-	if (inviter->id == AuthSession::CurrentUserPeerId()) {
+HistoryJoined::PreparedText HistoryJoined::GenerateText(not_null<History*> history, not_null<UserData*> inviter) {
+	if (inviter->id == Auth().userPeerId()) {
 		return { lang(history->isMegagroup() ? lng_action_you_joined_group : lng_action_you_joined) };
 	}
 	auto result = PreparedText {};

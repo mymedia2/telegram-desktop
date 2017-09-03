@@ -52,7 +52,7 @@ class MediaView : public TWidget, private base::Subscriber, public RPCSender, pu
 	Q_OBJECT
 
 public:
-	MediaView(QWidget*);
+	MediaView();
 
 	void setVisible(bool visible) override;
 
@@ -73,8 +73,6 @@ public:
 	}
 
 	void mediaOverviewUpdated(const Notify::PeerUpdate &update);
-	void documentUpdated(DocumentData *doc);
-	void changingMsgId(HistoryItem *row, MsgId newId);
 
 	void close();
 
@@ -126,7 +124,6 @@ private slots:
 
 	void onDropdown();
 
-	void onCheckActive();
 	void onTouchTimer();
 
 	void updateImage();
@@ -186,6 +183,9 @@ private:
 	void destroyThemePreview();
 	void updateThemePreviewGeometry();
 
+	void documentUpdated(DocumentData *doc);
+	void changingMsgId(HistoryItem *row, MsgId newId);
+
 	// Radial animation interface.
 	float64 radialProgress() const;
 	bool radialLoading() const;
@@ -223,6 +223,8 @@ private:
 	void updateOverRect(OverState state);
 	bool updateOverState(OverState newState);
 	float64 overLevel(OverState control) const;
+
+	MsgId getMsgIdFromOverview(not_null<History*> history, int index) const;
 
 	QBrush _transparentBrush;
 
@@ -294,7 +296,7 @@ private:
 	UserData *_user = nullptr; // if user profile photos overview
 
 	// There can be additional first photo in chat photos overview, that is not
-	// in the _history->overview[OverviewChatPhotos] (if the item was deleted).
+	// in the _history->overview(OverviewChatPhotos) (if the item was deleted).
 	PhotoData *_additionalChatPhoto = nullptr;
 
 	// We save the information about the reason of the current mediaview show:

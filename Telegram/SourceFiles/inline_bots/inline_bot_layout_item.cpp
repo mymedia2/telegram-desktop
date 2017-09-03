@@ -105,7 +105,7 @@ void ItemBase::layoutChanged() {
 	}
 }
 
-std::unique_ptr<ItemBase> ItemBase::createLayout(gsl::not_null<Context*> context, Result *result, bool forceThumb) {
+std::unique_ptr<ItemBase> ItemBase::createLayout(not_null<Context*> context, Result *result, bool forceThumb) {
 	using Type = Result::Type;
 
 	switch (result->_type) {
@@ -121,10 +121,10 @@ std::unique_ptr<ItemBase> ItemBase::createLayout(gsl::not_null<Context*> context
 	case Type::Game: return std::make_unique<internal::Game>(context, result); break;
 	case Type::Contact: return std::make_unique<internal::Contact>(context, result); break;
 	}
-	return std::unique_ptr<ItemBase>();
+	return nullptr;
 }
 
-std::unique_ptr<ItemBase> ItemBase::createLayoutGif(gsl::not_null<Context*> context, DocumentData *document) {
+std::unique_ptr<ItemBase> ItemBase::createLayoutGif(not_null<Context*> context, DocumentData *document) {
 	return std::make_unique<internal::Gif>(context, document, true);
 }
 

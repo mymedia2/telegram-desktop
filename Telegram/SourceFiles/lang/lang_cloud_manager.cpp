@@ -32,7 +32,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 
 namespace Lang {
 
-CloudManager::CloudManager(Instance &langpack, gsl::not_null<MTP::Instance*> mtproto) : MTP::Sender()
+CloudManager::CloudManager(Instance &langpack, not_null<MTP::Instance*> mtproto) : MTP::Sender()
 , _langpack(langpack) {
 	requestLangPackDifference();
 }
@@ -116,7 +116,7 @@ void CloudManager::requestLanguageList() {
 	_languagesRequestId = request(MTPlangpack_GetLanguages()).done([this](const MTPVector<MTPLangPackLanguage> &result) {
 		auto languages = Languages();
 		for_const (auto &langData, result.v) {
-			t_assert(langData.type() == mtpc_langPackLanguage);
+			Assert(langData.type() == mtpc_langPackLanguage);
 			auto &language = langData.c_langPackLanguage();
 			languages.push_back({ qs(language.vlang_code), qs(language.vname), qs(language.vnative_name) });
 		}
@@ -244,7 +244,7 @@ void CloudManager::switchToLanguage(QString id) {
 void CloudManager::performSwitchToCustom() {
 	auto filter = qsl("Language files (*.strings)");
 	auto title = qsl("Choose language .strings file");
-	FileDialog::GetOpenPath(title, filter, [weak = base::weak_unique_ptr<CloudManager>(this)](const FileDialog::OpenResult &result) {
+	FileDialog::GetOpenPath(title, filter, [weak = base::make_weak_unique(this)](const FileDialog::OpenResult &result) {
 		if (!weak || result.paths.isEmpty()) {
 			return;
 		}
@@ -312,7 +312,7 @@ void CloudManager::changeIdAndReInitConnection(const QString &id) {
 
 CloudManager &CurrentCloudManager() {
 	auto result = Messenger::Instance().langCloudManager();
-	t_assert(result != nullptr);
+	Assert(result != nullptr);
 	return *result;
 }
 

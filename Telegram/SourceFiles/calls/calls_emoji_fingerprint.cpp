@@ -126,7 +126,7 @@ uint64 ComputeEmojiIndex(base::const_byte_span bytes) {
 
 } // namespace
 
-std::vector<EmojiPtr> ComputeEmojiFingerprint(gsl::not_null<Call*> call) {
+std::vector<EmojiPtr> ComputeEmojiFingerprint(not_null<Call*> call) {
 	auto result = std::vector<EmojiPtr>();
 	constexpr auto EmojiCount = (base::array_size(Offsets) - 1);
 	for (auto index = 0; index != EmojiCount; ++index) {
@@ -134,7 +134,7 @@ std::vector<EmojiPtr> ComputeEmojiFingerprint(gsl::not_null<Call*> call) {
 		auto size = Offsets[index + 1] - offset;
 		auto string = QString::fromRawData(reinterpret_cast<QChar*>(Data + offset), size);
 		auto emoji = Ui::Emoji::Find(string);
-		t_assert(emoji != nullptr);
+		Assert(emoji != nullptr);
 	}
 	if (call->isKeyShaForFingerprintReady()) {
 		auto sha256 = call->getKeyShaForFingerprint();
@@ -146,7 +146,7 @@ std::vector<EmojiPtr> ComputeEmojiFingerprint(gsl::not_null<Call*> call) {
 			auto size = Offsets[index + 1] - offset;
 			auto string = QString::fromRawData(reinterpret_cast<QChar*>(Data + offset), size);
 			auto emoji = Ui::Emoji::Find(string);
-			t_assert(emoji != nullptr);
+			Assert(emoji != nullptr);
 			result.push_back(emoji);
 		}
 	}

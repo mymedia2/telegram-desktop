@@ -33,7 +33,7 @@ constexpr auto kSpecialRequestTimeoutMs = 6000; // 4 seconds timeout for it to w
 
 } // namespace
 
-ConfigLoader::ConfigLoader(gsl::not_null<Instance*> instance, RPCDoneHandlerPtr onDone, RPCFailHandlerPtr onFail) : _instance(instance)
+ConfigLoader::ConfigLoader(not_null<Instance*> instance, RPCDoneHandlerPtr onDone, RPCFailHandlerPtr onFail) : _instance(instance)
 	, _doneHandler(onDone)
 	, _failHandler(onFail) {
 	_enumDCTimer.setCallback([this] { enumerate(); });
@@ -46,7 +46,7 @@ void ConfigLoader::load() {
 		_enumDCTimer.callOnce(kEnumerateDcTimeout);
 	} else {
 		auto ids = _instance->dcOptions()->configEnumDcIds();
-		t_assert(!ids.empty());
+		Assert(!ids.empty());
 		_enumCurrent = ids.front();
 		enumerate();
 	}
@@ -89,7 +89,7 @@ void ConfigLoader::enumerate() {
 		_enumCurrent = _instance->mainDcId();
 	}
 	auto ids = _instance->dcOptions()->configEnumDcIds();
-	t_assert(!ids.empty());
+	Assert(!ids.empty());
 
 	auto i = std::find(ids.cbegin(), ids.cend(), _enumCurrent);
 	if (i == ids.cend() || (++i) == ids.cend()) {
@@ -142,7 +142,7 @@ void ConfigLoader::sendSpecialRequest() {
 		return;
 	}
 
-	auto weak = base::weak_unique_ptr<ConfigLoader>(this);
+	auto weak = base::make_weak_unique(this);
 	auto index = rand_value<uint32>() % uint32(_specialEndpoints.size());
 	auto endpoint = _specialEndpoints.begin() + index;
 	_specialEnumCurrent = specialToRealDcId(endpoint->dcId);

@@ -49,7 +49,7 @@ void StickerSetBox::prepare() {
 	setTitle(langFactory(lng_contacts_loading));
 
 	_inner = setInnerWidget(object_ptr<Inner>(this, _set), st::stickersScroll);
-	connect(App::main(), SIGNAL(stickersUpdated()), this, SLOT(onStickersUpdated()));
+	subscribe(Auth().data().stickersUpdated(), [this] { updateButtons(); });
 
 	setDimensions(st::boxWideWidth, st::stickersMaxHeight);
 
@@ -57,17 +57,11 @@ void StickerSetBox::prepare() {
 
 	connect(_inner, SIGNAL(updateButtons()), this, SLOT(onUpdateButtons()));
 	connect(_inner, SIGNAL(installed(uint64)), this, SLOT(onInstalled(uint64)));
-
-	onStickersUpdated();
 }
 
 void StickerSetBox::onInstalled(uint64 setId) {
 	emit installed(setId);
 	closeBox();
-}
-
-void StickerSetBox::onStickersUpdated() {
-	updateButtons();
 }
 
 void StickerSetBox::onAddStickers() {
@@ -115,9 +109,9 @@ StickerSetBox::Inner::Inner(QWidget *parent, const MTPInputStickerSet &set) : TW
 	case mtpc_inputStickerSetShortName: _setShortName = qs(set.c_inputStickerSetShortName().vshort_name); break;
 	}
 	MTP::send(MTPmessages_GetStickerSet(_input), rpcDone(&Inner::gotSet), rpcFail(&Inner::failedSet));
-	App::main()->updateStickers();
+	Auth().api().updateStickers();
 
-	subscribe(AuthSession::CurrentDownloaderTaskFinished(), [this] { update(); });
+	subscribe(Auth().downloaderTaskFinished(), [this] { update(); });
 
 	setMouseTracking(true);
 
@@ -164,7 +158,7 @@ void StickerSetBox::Inner::gotSet(const MTPmessages_StickerSet &set) {
 		}
 		if (d.vset.type() == mtpc_stickerSet) {
 			auto &s = d.vset.c_stickerSet();
-			_setTitle = stickerSetTitle(s);
+			_setTitle = Stickers::GetSetTitle(s);
 			_setShortName = qs(s.vshort_name);
 			_setId = s.vid.v;
 			_setAccess = s.vaccess_hash.v;
@@ -248,13 +242,13 @@ void StickerSetBox::Inner::installDone(const MTPmessages_StickerSetInstallResult
 	}
 
 	if (result.type() == mtpc_messages_stickerSetInstallResultArchive) {
-		Stickers::applyArchivedResult(result.c_messages_stickerSetInstallResultArchive());
+		Stickers::ApplyArchivedResult(result.c_messages_stickerSetInstallResultArchive());
 	} else {
 		if (wasArchived) {
 			Local::writeArchivedStickers();
 		}
 		Local::writeInstalledStickers();
-		emit App::main()->stickersUpdated();
+		Auth().data().stickersUpdated().notify(true);
 	}
 	emit installed(_setId);
 }
@@ -367,7 +361,7 @@ void StickerSetBox::Inner::paintEvent(QPaintEvent *e) {
 		for (int32 j = 0; j < kStickersPanelPerRow; ++j) {
 			int32 index = i * kStickersPanelPerRow + j;
 			if (index >= _pack.size()) break;
-			t_assert(index < _packOvers.size());
+			Assert(index < _packOvers.size());
 
 			DocumentData *doc = _pack.at(index);
 			QPoint pos(st::stickersPadding.left() + j * st::stickersSize.width(), st::stickersPadding.top() + i * st::stickersSize.height());

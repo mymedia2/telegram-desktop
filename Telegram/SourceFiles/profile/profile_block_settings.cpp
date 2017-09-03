@@ -25,7 +25,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "styles/style_profile.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
-#include "boxes/contacts_box.h"
+#include "boxes/peer_list_controllers.h"
 #include "boxes/confirm_box.h"
 #include "observer_peer.h"
 #include "auth_session.h"
@@ -115,7 +115,7 @@ void SettingsWidget::refreshButtons() {
 
 void SettingsWidget::refreshEnableNotifications() {
 	if (peer()->notify == UnknownNotifySettings) {
-		App::api()->requestNotifySetting(peer());
+		Auth().api().requestNotifySetting(peer());
 	} else {
 		auto &notifySettings = peer()->notify;
 		bool enabled = (notifySettings == EmptyNotifySettings || notifySettings->mute < unixtime());
@@ -210,7 +210,7 @@ void SettingsWidget::onNotificationsChange() {
 
 void SettingsWidget::onManageAdmins() {
 	if (auto chat = peer()->asChat()) {
-		Ui::show(Box<ContactsBox>(chat, MembersFilter::Admins));
+		EditChatAdminsBoxController::Start(chat);
 	} else if (auto channel = peer()->asChannel()) {
 		ParticipantsBoxController::Start(channel, ParticipantsBoxController::Role::Admins);
 	}
@@ -250,7 +250,7 @@ void SettingsWidget::onInviteLink() {
 	auto text = lang(link.isEmpty() ? lng_group_invite_about : lng_group_invite_about_new);
 	Ui::show(Box<ConfirmBox>(text, base::lambda_guarded(this, [this] {
 		Ui::hideLayer();
-		App::api()->exportInviteLink(peer());
+		Auth().api().exportInviteLink(peer());
 	})));
 }
 

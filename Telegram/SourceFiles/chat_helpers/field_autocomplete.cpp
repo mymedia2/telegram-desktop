@@ -28,6 +28,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "styles/style_widgets.h"
 #include "styles/style_chat_helpers.h"
 #include "auth_session.h"
+#include "chat_helpers/stickers.h"
 
 FieldAutocomplete::FieldAutocomplete(QWidget *parent) : TWidget(parent)
 , _scroll(this, st::mentionScroll) {
@@ -147,30 +148,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 	internal::BotCommandRows brows;
 	StickerPack srows;
 	if (_emoji) {
-		auto original = _emoji->original();
-		QMap<uint64, uint64> setsToRequest;
-		auto &sets = Global::RefStickerSets();
-		auto &order = Global::StickerSetsOrder();
-		for (auto i = 0, l = order.size(); i != l; ++i) {
-			auto it = sets.find(order[i]);
-			if (it != sets.cend()) {
-				if (it->emoji.isEmpty()) {
-					setsToRequest.insert(it->id, it->access);
-					it->flags |= MTPDstickerSet_ClientFlag::f_not_loaded;
-				} else if (!(it->flags & MTPDstickerSet::Flag::f_archived)) {
-					auto i = it->emoji.constFind(original);
-					if (i != it->emoji.cend()) {
-						srows += *i;
-					}
-				}
-			}
-		}
-		if (!setsToRequest.isEmpty() && App::api()) {
-			for (QMap<uint64, uint64>::const_iterator i = setsToRequest.cbegin(), e = setsToRequest.cend(); i != e; ++i) {
-				App::api()->scheduleStickerSetRequest(i.key(), i.value());
-			}
-			App::api()->requestStickerSets();
-		}
+		srows = Stickers::GetListByEmoji(_emoji);
 	} else if (_type == Type::Mentions) {
 		int maxListSize = _addInlineBots ? cRecentInlineBots().size() : 0;
 		if (_chat) {
@@ -215,7 +193,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 			QMultiMap<int32, UserData*> ordered;
 			mrows.reserve(mrows.size() + (_chat->participants.isEmpty() ? _chat->lastAuthors.size() : _chat->participants.size()));
 			if (_chat->noParticipantInfo()) {
-				if (App::api()) App::api()->requestFullPeer(_chat);
+				Auth().api().requestFullPeer(_chat);
 			} else if (!_chat->participants.isEmpty()) {
 				for (auto i = _chat->participants.cbegin(), e = _chat->participants.cend(); i != e; ++i) {
 					auto user = i.key();
@@ -243,7 +221,7 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 		} else if (_channel && _channel->isMegagroup()) {
 			QMultiMap<int32, UserData*> ordered;
 			if (_channel->mgInfo->lastParticipants.isEmpty() || _channel->lastParticipantsCountOutdated()) {
-				if (App::api()) App::api()->requestLastParticipants(_channel);
+				Auth().api().requestLastParticipants(_channel);
 			} else {
 				mrows.reserve(mrows.size() + _channel->mgInfo->lastParticipants.size());
 				for_const (auto user, _channel->mgInfo->lastParticipants) {
@@ -271,28 +249,36 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 		int32 cnt = 0;
 		if (_chat) {
 			if (_chat->noParticipantInfo()) {
-				if (App::api()) App::api()->requestFullPeer(_chat);
+				Auth().api().requestFullPeer(_chat);
 			} else if (!_chat->participants.isEmpty()) {
 				for (auto i = _chat->participants.cbegin(), e = _chat->participants.cend(); i != e; ++i) {
 					auto user = i.key();
 					if (!user->botInfo) continue;
-					if (!user->botInfo->inited && App::api()) App::api()->requestFullPeer(user);
+					if (!user->botInfo->inited) {
+						Auth().api().requestFullPeer(user);
+					}
 					if (user->botInfo->commands.isEmpty()) continue;
 					bots.insert(user, true);
 					cnt += user->botInfo->commands.size();
 				}
 			}
 		} else if (_user && _user->botInfo) {
-			if (!_user->botInfo->inited && App::api()) App::api()->requestFullPeer(_user);
+			if (!_user->botInfo->inited) {
+				Auth().api().requestFullPeer(_user);
+			}
 			cnt = _user->botInfo->commands.size();
 			bots.insert(_user, true);
 		} else if (_channel && _channel->isMegagroup()) {
 			if (_channel->mgInfo->bots.isEmpty()) {
-				if (!_channel->mgInfo->botStatus && App::api()) App::api()->requestBots(_channel);
+				if (!_channel->mgInfo->botStatus) {
+					Auth().api().requestBots(_channel);
+				}
 			} else {
 				for_const (auto user, _channel->mgInfo->bots) {
 					if (!user->botInfo) continue;
-					if (!user->botInfo->inited && App::api()) App::api()->requestFullPeer(user);
+					if (!user->botInfo->inited) {
+						Auth().api().requestFullPeer(user);
+					}
 					if (user->botInfo->commands.isEmpty()) continue;
 					bots.insert(user, true);
 					cnt += user->botInfo->commands.size();
@@ -307,7 +293,9 @@ void FieldAutocomplete::updateFiltered(bool resetScroll) {
 					auto user = *i;
 					if (!user->botInfo) continue;
 					if (!bots.contains(user)) continue;
-					if (!user->botInfo->inited && App::api()) App::api()->requestFullPeer(user);
+					if (!user->botInfo->inited) {
+						Auth().api().requestFullPeer(user);
+					}
 					if (user->botInfo->commands.isEmpty()) continue;
 					bots.remove(user);
 					for (auto j = 0, l = user->botInfo->commands.size(); j != l; ++j) {
@@ -534,7 +522,7 @@ FieldAutocompleteInner::FieldAutocompleteInner(FieldAutocomplete *parent, Mentio
 , _previewShown(false) {
 	_previewTimer.setSingleShot(true);
 	connect(&_previewTimer, SIGNAL(timeout()), this, SLOT(onPreview()));
-	subscribe(AuthSession::CurrentDownloaderTaskFinished(), [this] { update(); });
+	subscribe(Auth().downloaderTaskFinished(), [this] { update(); });
 }
 
 void FieldAutocompleteInner::paintEvent(QPaintEvent *e) {

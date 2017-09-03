@@ -82,30 +82,17 @@ void IndexedList::moveToTop(PeerData *peer) {
 
 void IndexedList::movePinned(Row *row, int deltaSign) {
 	auto swapPinnedIndexWith = find(row);
-	t_assert(swapPinnedIndexWith != cend());
+	Assert(swapPinnedIndexWith != cend());
 	if (deltaSign > 0) {
 		++swapPinnedIndexWith;
 	} else {
-		t_assert(swapPinnedIndexWith != cbegin());
+		Assert(swapPinnedIndexWith != cbegin());
 		--swapPinnedIndexWith;
 	}
 	auto history1 = row->history();
 	auto history2 = (*swapPinnedIndexWith)->history();
-
-	// Debug an assertion violation.
-	if (!history2->isPinnedDialog()) {
-		auto myPinnedCount = 0;
-		for_const (auto row, *this) {
-			if (!row->history()->isPinnedDialog()) {
-				break;
-			}
-			++myPinnedCount;
-		}
-		SignalHandlers::setCrashAnnotation("DebugInfo", QString("row index: %1, deltaSign: %2, pinnedCount: %3, myPinnedCount: %4").arg(row->pos()).arg(deltaSign).arg(App::histories().pinnedCount()).arg(myPinnedCount));
-	}
-
-	t_assert(history1->isPinnedDialog());
-	t_assert(history2->isPinnedDialog());
+	Assert(history1->isPinnedDialog());
+	Assert(history2->isPinnedDialog());
 	auto index1 = history1->getPinnedIndex();
 	auto index2 = history2->getPinnedIndex();
 	history1->setPinnedIndex(index2);
@@ -113,7 +100,7 @@ void IndexedList::movePinned(Row *row, int deltaSign) {
 }
 
 void IndexedList::peerNameChanged(PeerData *peer, const PeerData::Names &oldNames, const PeerData::NameFirstChars &oldChars) {
-	t_assert(_sortMode != SortMode::Date);
+	Assert(_sortMode != SortMode::Date);
 	if (_sortMode == SortMode::Name) {
 		adjustByName(peer, oldNames, oldChars);
 	} else {
@@ -122,7 +109,7 @@ void IndexedList::peerNameChanged(PeerData *peer, const PeerData::Names &oldName
 }
 
 void IndexedList::peerNameChanged(Mode list, PeerData *peer, const PeerData::Names &oldNames, const PeerData::NameFirstChars &oldChars) {
-	t_assert(_sortMode == SortMode::Date);
+	Assert(_sortMode == SortMode::Date);
 	adjustNames(list, peer, oldNames, oldChars);
 }
 

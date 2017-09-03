@@ -21,47 +21,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #pragma once
 
 #include "core/basic_types.h"
-#include <array>
-#include <vector>
-#include <algorithm>
-#include <set>
-#include <gsl/gsl>
-
-// Release build assertions.
-inline void t_noop() {
-}
-[[noreturn]] inline void t_assert_fail(const char *message, const char *file, int32 line) {
-	auto info = qsl("%1 %2:%3").arg(message).arg(file).arg(line);
-	LOG(("Assertion Failed! ") + info);
-	SignalHandlers::setCrashAnnotation("Assertion", info);
-
-	// Crash with access violation and generate crash report.
-	volatile int *t_assert_nullptr = nullptr;
-	*t_assert_nullptr = 0;
-
-	// Silent the possible failure to comply noreturn warning.
-	std::abort();
-}
-#define t_assert_full(condition, message, file, line) ((GSL_UNLIKELY(!(condition))) ? t_assert_fail(message, file, line) : t_noop())
-#define t_assert_c(condition, comment) t_assert_full(condition, "\"" #condition "\" (" comment ")", __FILE__, __LINE__)
-#define t_assert(condition) t_assert_full(condition, "\"" #condition "\"", __FILE__, __LINE__)
-
-// Declare our own versions of Expects() and Ensures().
-// Let them crash with reports and logging.
-#ifdef Expects
-#undef Expects
-#endif // Expects
-#define Expects(condition) t_assert_full(condition, "\"" #condition "\"", __FILE__, __LINE__)
-
-#ifdef Ensures
-#undef Ensures
-#endif // Ensures
-#define Ensures(condition) t_assert_full(condition, "\"" #condition "\"", __FILE__, __LINE__)
-
-#ifdef Unexpected
-#undef Unexpected
-#endif // Unexpected
-#define Unexpected(message) t_assert_fail("Unexpected: " message, __FILE__, __LINE__)
+#include "base/flags.h"
 
 // Define specializations for QByteArray for Qt 5.3.2, because
 // QByteArray in Qt 5.3.2 doesn't declare "pointer" subtype.
@@ -112,31 +72,6 @@ inline constexpr D up_cast(T object) {
 	using DV = std::decay_t<decltype(*D())>;
 	using TV = std::decay_t<decltype(*T())>;
 	return internal::up_cast_helper<D>(std::integral_constant<bool, std::is_base_of<DV, TV>::value || std::is_same<DV, TV>::value>(), object);
-}
-
-template <typename Lambda>
-class scope_guard_helper {
-public:
-	scope_guard_helper(Lambda on_scope_exit) : _handler(std::move(on_scope_exit)) {
-	}
-	void dismiss() {
-		_dismissed = true;
-	}
-	~scope_guard_helper() {
-		if (!_dismissed) {
-			_handler();
-		}
-	}
-
-private:
-	Lambda _handler;
-	bool _dismissed = false;
-
-};
-
-template <typename Lambda>
-scope_guard_helper<Lambda> scope_guard(Lambda on_scope_exit) {
-	return scope_guard_helper<Lambda>(std::move(on_scope_exit));
 }
 
 template <typename Container, typename T>
@@ -243,11 +178,6 @@ reversion_wrapper<Container> reversed(Container &&container) {
 // if you have "QVector<T*> v" then "for (T * const p : v)" will still call QVector::detach(),
 // while "for_const (T *p, v)" won't and "for_const (T *&p, v)" won't compile
 #define for_const(range_declaration, range_expression) for (range_declaration : std::as_const(range_expression))
-
-template <typename Enum>
-inline constexpr QFlags<Enum> qFlags(Enum v) {
-	return QFlags<Enum>(v);
-}
 
 template <typename Lambda>
 inline void InvokeQueued(QObject *context, Lambda &&lambda) {
@@ -445,7 +375,7 @@ inline void memsetrnd_bad(T &value) {
 
 class ReadLockerAttempt {
 public:
-	ReadLockerAttempt(gsl::not_null<QReadWriteLock*> lock) : _lock(lock), _locked(_lock->tryLockForRead()) {
+	ReadLockerAttempt(not_null<QReadWriteLock*> lock) : _lock(lock), _locked(_lock->tryLockForRead()) {
 	}
 	ReadLockerAttempt(const ReadLockerAttempt &other) = delete;
 	ReadLockerAttempt &operator=(const ReadLockerAttempt &other) = delete;
@@ -467,7 +397,7 @@ public:
 	}
 
 private:
-	gsl::not_null<QReadWriteLock*> _lock;
+	not_null<QReadWriteLock*> _lock;
 	bool _locked = false;
 
 };
@@ -647,8 +577,8 @@ enum ShowLayerOption {
 	AnimatedShowLayer = 0x00,
 	ForceFastShowLayer = 0x04,
 };
-Q_DECLARE_FLAGS(ShowLayerOptions, ShowLayerOption);
-Q_DECLARE_OPERATORS_FOR_FLAGS(ShowLayerOptions);
+using ShowLayerOptions = base::flags<ShowLayerOption>;
+inline constexpr auto is_flag_type(ShowLayerOption) { return true; };
 
 static int32 FullArcLength = 360 * 16;
 static int32 QuarterArcLength = (FullArcLength / 4);
@@ -697,7 +627,7 @@ public:
 		return data();
 	}
 	T &operator*() const {
-		t_assert(!isNull());
+		Assert(!isNull());
 		return *data();
 	}
 	explicit operator bool() const {
@@ -740,7 +670,7 @@ public:
 		return data();
 	}
 	T &operator*() const {
-		t_assert(!isNull());
+		Assert(!isNull());
 		return *data();
 	}
 	explicit operator bool() const {

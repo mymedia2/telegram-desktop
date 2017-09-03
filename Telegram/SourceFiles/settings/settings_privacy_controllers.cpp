@@ -26,6 +26,7 @@ Copyright (c) 2014-2017 John Preston, https://desktop.telegram.org
 #include "mainwidget.h"
 #include "auth_session.h"
 #include "storage/localstorage.h"
+#include "boxes/peer_list_controllers.h"
 #include "boxes/confirm_box.h"
 
 namespace Settings {
@@ -35,24 +36,24 @@ constexpr auto kBlockedPerPage = 40;
 
 class BlockUserBoxController : public ChatsListBoxController {
 public:
-	void rowClicked(gsl::not_null<PeerListRow*> row) override;
+	void rowClicked(not_null<PeerListRow*> row) override;
 
-	void setBlockUserCallback(base::lambda<void(gsl::not_null<UserData*> user)> callback) {
+	void setBlockUserCallback(base::lambda<void(not_null<UserData*> user)> callback) {
 		_blockUserCallback = std::move(callback);
 	}
 
 protected:
 	void prepareViewHook() override;
-	std::unique_ptr<Row> createRow(gsl::not_null<History*> history) override;
-	void updateRowHook(Row *row) override {
+	std::unique_ptr<Row> createRow(not_null<History*> history) override;
+	void updateRowHook(not_null<Row*> row) override {
 		updateIsBlocked(row, row->peer()->asUser());
 		delegate()->peerListUpdateRow(row);
 	}
 
 private:
-	void updateIsBlocked(gsl::not_null<PeerListRow*> row, UserData *user) const;
+	void updateIsBlocked(not_null<PeerListRow*> row, UserData *user) const;
 
-	base::lambda<void(gsl::not_null<UserData*> user)> _blockUserCallback;
+	base::lambda<void(not_null<UserData*> user)> _blockUserCallback;
 
 };
 
@@ -68,9 +69,9 @@ void BlockUserBoxController::prepareViewHook() {
 	}));
 }
 
-void BlockUserBoxController::updateIsBlocked(gsl::not_null<PeerListRow*> row, UserData *user) const {
+void BlockUserBoxController::updateIsBlocked(not_null<PeerListRow*> row, UserData *user) const {
 	auto blocked = user->isBlocked();
-	row->setDisabled(blocked);
+	row->setDisabledState(blocked ? PeerListRow::State::DisabledChecked : PeerListRow::State::Active);
 	if (blocked) {
 		row->setCustomStatus(lang(lng_blocked_list_already_blocked));
 	} else {
@@ -78,17 +79,20 @@ void BlockUserBoxController::updateIsBlocked(gsl::not_null<PeerListRow*> row, Us
 	}
 }
 
-void BlockUserBoxController::rowClicked(gsl::not_null<PeerListRow*> row) {
+void BlockUserBoxController::rowClicked(not_null<PeerListRow*> row) {
 	_blockUserCallback(row->peer()->asUser());
 }
 
-std::unique_ptr<BlockUserBoxController::Row> BlockUserBoxController::createRow(gsl::not_null<History*> history) {
+std::unique_ptr<BlockUserBoxController::Row> BlockUserBoxController::createRow(not_null<History*> history) {
+	if (history->peer->isSelf()) {
+		return nullptr;
+	}
 	if (auto user = history->peer->asUser()) {
 		auto row = std::make_unique<Row>(history);
 		updateIsBlocked(row.get(), user);
 		return row;
 	}
-	return std::unique_ptr<Row>();
+	return nullptr;
 }
 
 } // namespace
@@ -138,15 +142,15 @@ void BlockedBoxController::loadMoreRows() {
 	}).send();
 }
 
-void BlockedBoxController::rowClicked(gsl::not_null<PeerListRow*> row) {
+void BlockedBoxController::rowClicked(not_null<PeerListRow*> row) {
 	Ui::showPeerHistoryAsync(row->peer()->id, ShowAtUnreadMsgId);
 }
 
-void BlockedBoxController::rowActionClicked(gsl::not_null<PeerListRow*> row) {
+void BlockedBoxController::rowActionClicked(not_null<PeerListRow*> row) {
 	auto user = row->peer()->asUser();
 	Expects(user != nullptr);
 
-	App::api()->unblockUser(user);
+	Auth().api().unblockUser(user);
 }
 
 void BlockedBoxController::receivedUsers(const QVector<MTPContactBlocked> &result) {
@@ -183,9 +187,9 @@ void BlockedBoxController::handleBlockedEvent(UserData *user) {
 
 void BlockedBoxController::BlockNewUser() {
 	auto controller = std::make_unique<BlockUserBoxController>();
-	auto initBox = [controller = controller.get()](PeerListBox *box) {
-		controller->setBlockUserCallback([box](gsl::not_null<UserData*> user) {
-			App::api()->blockUser(user);
+	auto initBox = [controller = controller.get()](not_null<PeerListBox*> box) {
+		controller->setBlockUserCallback([box](not_null<UserData*> user) {
+			Auth().api().blockUser(user);
 			box->closeBox();
 		});
 		box->addButton(langFactory(lng_cancel), [box] { box->closeBox(); });
@@ -261,14 +265,14 @@ QString LastSeenPrivacyController::exceptionsDescription() {
 }
 
 void LastSeenPrivacyController::confirmSave(bool someAreDisallowed, base::lambda_once<void()> saveCallback) {
-	if (someAreDisallowed && !AuthSession::Current().data().lastSeenWarningSeen()) {
+	if (someAreDisallowed && !Auth().data().lastSeenWarningSeen()) {
 		auto weakBox = std::make_shared<QPointer<ConfirmBox>>();
 		auto callback = [weakBox, saveCallback = std::move(saveCallback)]() mutable {
 			if (auto box = *weakBox) {
 				box->closeBox();
 			}
 			saveCallback();
-			AuthSession::Current().data().setLastSeenWarningSeen(true);
+			Auth().data().setLastSeenWarningSeen(true);
 			Local::writeUserSettings();
 		};
 		auto box = Box<ConfirmBox>(lang(lng_edit_privacy_lastseen_warning), lang(lng_continue), lang(lng_cancel), std::move(callback));

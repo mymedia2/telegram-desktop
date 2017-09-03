@@ -41,7 +41,7 @@ namespace App {
 namespace internal {
 
 void CallDelayed(int duration, base::lambda_once<void()> &&lambda) {
-	QTimer::singleShot(duration, base::lambda_slot_once(App::app(), std::move(lambda)), SLOT(action()));
+	Messenger::Instance().callDelayed(duration, std::move(lambda));
 }
 
 } // namespace internal
@@ -188,7 +188,7 @@ void activateClickHandler(ClickHandlerPtr handler, Qt::MouseButton button) {
 }
 
 void logOutDelayed() {
-	App::CallDelayed(1, App::app(), [] {
+	InvokeQueued(QCoreApplication::instance(), [] {
 		App::logOut();
 	});
 }
@@ -241,12 +241,7 @@ bool isLayerShown() {
 	return false;
 }
 
-bool isMediaViewShown() {
-	if (auto w = App::wnd()) return w->ui_isMediaViewShown();
-	return false;
-}
-
-void repaintHistoryItem(gsl::not_null<const HistoryItem*> item) {
+void repaintHistoryItem(not_null<const HistoryItem*> item) {
 	if (auto main = App::main()) {
 		main->ui_repaintHistoryItem(item);
 	}
@@ -282,19 +277,7 @@ void showPeerHistoryAsync(const PeerId &peer, MsgId msgId, ShowWay way) {
 }
 
 PeerData *getPeerForMouseAction() {
-	if (auto w = App::wnd()) {
-		return w->ui_getPeerForMouseAction();
-	}
-	return nullptr;
-}
-
-bool hideWindowNoQuit() {
-	if (!App::quitting()) {
-		if (auto w = App::wnd()) {
-			return w->hideNoQuit();
-		}
-	}
-	return false;
+	return Messenger::Instance().ui_getPeerForMouseAction();
 }
 
 bool skipPaintEvent(QWidget *widget, QPaintEvent *event) {
@@ -364,7 +347,7 @@ void handlePendingHistoryUpdate() {
 	if (!AuthSession::Exists()) {
 		return;
 	}
-	AuthSession::Current().data().pendingHistoryResize().notify(true);
+	Auth().data().pendingHistoryResize().notify(true);
 
 	for (auto item : base::take(Global::RefPendingRepaintItems())) {
 		Ui::repaintHistoryItem(item);
@@ -389,17 +372,17 @@ void unreadCounterUpdated() {
 } // namespace Notify
 
 #define DefineReadOnlyVar(Namespace, Type, Name) const Type &Name() { \
-	t_assert_full(Namespace##Data != 0, #Namespace "Data != nullptr in " #Namespace "::" #Name, __FILE__, __LINE__); \
+	AssertCustom(Namespace##Data != nullptr, #Namespace "Data != nullptr in " #Namespace "::" #Name); \
 	return Namespace##Data->Name; \
 }
 #define DefineRefVar(Namespace, Type, Name) DefineReadOnlyVar(Namespace, Type, Name) \
 Type &Ref##Name() { \
-	t_assert_full(Namespace##Data != 0, #Namespace "Data != nullptr in " #Namespace "::Ref" #Name, __FILE__, __LINE__); \
+	AssertCustom(Namespace##Data != nullptr, #Namespace "Data != nullptr in " #Namespace "::Ref" #Name); \
 	return Namespace##Data->Name; \
 }
 #define DefineVar(Namespace, Type, Name) DefineRefVar(Namespace, Type, Name) \
 void Set##Name(const Type &Name) { \
-	t_assert_full(Namespace##Data != 0, #Namespace "Data != nullptr in " #Namespace "::Set" #Name, __FILE__, __LINE__); \
+	AssertCustom(Namespace##Data != nullptr, #Namespace "Data != nullptr in " #Namespace "::Set" #Name); \
 	Namespace##Data->Name = Name; \
 }
 
@@ -535,53 +518,14 @@ DefineVar(Sandbox, ProxyData, PreLaunchProxy);
 
 } // namespace Sandbox
 
-namespace Stickers {
-
-Set *feedSet(const MTPDstickerSet &set) {
-	MTPDstickerSet::Flags flags = 0;
-
-	auto &sets = Global::RefStickerSets();
-	auto it = sets.find(set.vid.v);
-	auto title = stickerSetTitle(set);
-	if (it == sets.cend()) {
-		it = sets.insert(set.vid.v, Stickers::Set(set.vid.v, set.vaccess_hash.v, title, qs(set.vshort_name), set.vcount.v, set.vhash.v, set.vflags.v | MTPDstickerSet_ClientFlag::f_not_loaded));
-	} else {
-		it->access = set.vaccess_hash.v;
-		it->title = title;
-		it->shortName = qs(set.vshort_name);
-		flags = it->flags;
-		auto clientFlags = it->flags & (MTPDstickerSet_ClientFlag::f_featured | MTPDstickerSet_ClientFlag::f_unread | MTPDstickerSet_ClientFlag::f_not_loaded | MTPDstickerSet_ClientFlag::f_special);
-		it->flags = set.vflags.v | clientFlags;
-		if (it->count != set.vcount.v || it->hash != set.vhash.v || it->emoji.isEmpty()) {
-			it->count = set.vcount.v;
-			it->hash = set.vhash.v;
-			it->flags |= MTPDstickerSet_ClientFlag::f_not_loaded; // need to request this set
-		}
-	}
-	auto changedFlags = (flags ^ it->flags);
-	if (changedFlags & MTPDstickerSet::Flag::f_archived) {
-		auto index = Global::ArchivedStickerSetsOrder().indexOf(it->id);
-		if (it->flags & MTPDstickerSet::Flag::f_archived) {
-			if (index < 0) {
-				Global::RefArchivedStickerSetsOrder().push_front(it->id);
-			}
-		} else if (index >= 0) {
-			Global::RefArchivedStickerSetsOrder().removeAt(index);
-		}
-	}
-	return &it.value();
-}
-
-} // namespace Stickers
-
 namespace Global {
 namespace internal {
 
 struct Data {
-	SingleQueuedInvokation HandleHistoryUpdate = { [] { App::app()->call_handleHistoryUpdate(); } };
-	SingleQueuedInvokation HandleUnreadCounterUpdate = { [] { App::app()->call_handleUnreadCounterUpdate(); } };
-	SingleQueuedInvokation HandleDelayedPeerUpdates = { [] { App::app()->call_handleDelayedPeerUpdates(); } };
-	SingleQueuedInvokation HandleObservables = { [] { App::app()->call_handleObservables(); } };
+	SingleQueuedInvokation HandleHistoryUpdate = { [] { Messenger::Instance().call_handleHistoryUpdate(); } };
+	SingleQueuedInvokation HandleUnreadCounterUpdate = { [] { Messenger::Instance().call_handleUnreadCounterUpdate(); } };
+	SingleQueuedInvokation HandleDelayedPeerUpdates = { [] { Messenger::Instance().call_handleDelayedPeerUpdates(); } };
+	SingleQueuedInvokation HandleObservables = { [] { Messenger::Instance().call_handleObservables(); } };
 
 	Adaptive::WindowLayout AdaptiveWindowLayout = Adaptive::WindowLayout::Normal;
 	Adaptive::ChatLayout AdaptiveChatLayout = Adaptive::ChatLayout::Normal;
@@ -619,6 +563,7 @@ struct Data {
 	int32 SavedGifsLimit = 200;
 	int32 EditTimeLimit = 172800;
 	int32 StickersRecentLimit = 30;
+	int32 StickersFavedLimit = 30; // TODO
 	int32 PinnedDialogsCountMax = 5;
 	QString InternalLinksDomain = qsl("https://t.me/");
 	int32 CallReceiveTimeoutMs = 20000;
@@ -636,6 +581,7 @@ struct Data {
 	Stickers::Order StickerSetsOrder;
 	TimeMs LastStickersUpdate = 0;
 	TimeMs LastRecentStickersUpdate = 0;
+	TimeMs LastFavedStickersUpdate = 0;
 	Stickers::Order FeaturedStickerSetsOrder;
 	int FeaturedStickerSetsUnreadCount = 0;
 	base::Observable<void> FeaturedStickerSetsUnreadCountChanged;
@@ -740,6 +686,7 @@ DefineVar(Global, int32, PushChatLimit);
 DefineVar(Global, int32, SavedGifsLimit);
 DefineVar(Global, int32, EditTimeLimit);
 DefineVar(Global, int32, StickersRecentLimit);
+DefineVar(Global, int32, StickersFavedLimit);
 DefineVar(Global, int32, PinnedDialogsCountMax);
 DefineVar(Global, QString, InternalLinksDomain);
 DefineVar(Global, int32, CallReceiveTimeoutMs);
@@ -757,6 +704,7 @@ DefineVar(Global, Stickers::Sets, StickerSets);
 DefineVar(Global, Stickers::Order, StickerSetsOrder);
 DefineVar(Global, TimeMs, LastStickersUpdate);
 DefineVar(Global, TimeMs, LastRecentStickersUpdate);
+DefineVar(Global, TimeMs, LastFavedStickersUpdate);
 DefineVar(Global, Stickers::Order, FeaturedStickerSetsOrder);
 DefineVar(Global, int, FeaturedStickerSetsUnreadCount);
 DefineRefVar(Global, base::Observable<void>, FeaturedStickerSetsUnreadCountChanged);
