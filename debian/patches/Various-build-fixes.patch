@@ -10,7 +10,7 @@ Last-Update: 2017-08-03
 
 --- a/Telegram/SourceFiles/config.h
 +++ b/Telegram/SourceFiles/config.h
-@@ -259,7 +259,7 @@
+@@ -255,7 +255,7 @@ static const char *ApiHash = "344583e457
  #endif
  
  #if Q_BYTE_ORDER == Q_BIG_ENDIAN
@@ -21,12 +21,15 @@ Last-Update: 2017-08-03
  #ifndef BETA_VERSION_MACRO
 --- a/Telegram/SourceFiles/core/basic_types.h
 +++ b/Telegram/SourceFiles/core/basic_types.h
-@@ -25,12 +25,8 @@
+@@ -25,15 +25,11 @@ Copyright (c) 2014-2017 John Preston, ht
  #include <memory>
  #include <ctime>
  
 -#include "base/build_config.h"
 -
+ template <typename Type>
+ using not_null = gsl::not_null<Type>;
+ 
  // Custom libc++ build used for old OS X versions already has this.
 -#ifndef OS_MAC_OLD
 -
@@ -35,7 +38,7 @@ Last-Update: 2017-08-03
  namespace std {
  
  template <typename T>
-@@ -42,9 +38,7 @@ template <typename T>
+@@ -45,9 +41,7 @@ template <typename T>
  void as_const(const T&&) = delete;
  
  } // namespace std
@@ -46,10 +49,10 @@ Last-Update: 2017-08-03
  
  #include "base/ordered_set.h"
  
-@@ -84,3 +78,17 @@ friend Q_DECL_CONSTEXPR QFlags<Flags::en
- Q_DECLARE_FRIEND_INCOMPATIBLE_FLAGS(Flags)
+@@ -63,3 +57,17 @@ using float64 = double;
  
- #endif // OS_MAC_OLD
+ #define qsl(s) QStringLiteral(s)
+ #define qstr(s) QLatin1String(s, sizeof(s) - 1)
 +
 +#if defined(__GNUC__) || defined(__clang__)
 +#define WARN_UNUSED_RESULT __attribute__((warn_unused_result))
@@ -81,8 +84,10 @@ Last-Update: 2017-08-03
  
 --- a/Telegram/gyp/telegram_sources.txt
 +++ b/Telegram/gyp/telegram_sources.txt
-@@ -1,4 +1,3 @@
+@@ -1,6 +1,5 @@
+ <(src_loc)/base/algorithm.h
+ <(src_loc)/base/assertion.h
 -<(src_loc)/base/build_config.h
- <(src_loc)/base/lambda.h
- <(src_loc)/base/observer.cpp
- <(src_loc)/base/observer.h
+ <(src_loc)/base/flags.h
+ <(src_loc)/base/flat_map.h
+ <(src_loc)/base/flat_set.h

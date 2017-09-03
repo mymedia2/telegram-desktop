@@ -2,7 +2,7 @@ Avoid-depending-on-static-libraries.patch
 Flags-for-precompiled-header-and-MOC.patch
 Debian-API-ID.patch
 Remove-useless-flags.patch
-Downgrade-Qt-version.patch
 Various-build-fixes.patch
 Packed-resources.patch
 Fix-Insecure-cWorkingDir-permissions.patch
+Downgrade-Qt-version.patch

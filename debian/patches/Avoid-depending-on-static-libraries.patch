@@ -49,10 +49,11 @@ Last-Update: 2017-07-29
        'style_files': [
          '<(res_loc)/colors.palette',
          '<(res_loc)/basic.style',
-@@ -79,12 +80,9 @@
+@@ -79,13 +80,9 @@
        'codegen.gyp:codegen_lang',
        'codegen.gyp:codegen_numbers',
        'codegen.gyp:codegen_style',
+-      'tests/tests.gyp:tests',
 -      'utils.gyp:Updater',
 -      '../ThirdParty/libtgvoip/libtgvoip.gyp:libtgvoip',
      ],
@@ -62,7 +63,7 @@ Last-Update: 2017-07-29
        'AL_ALEXT_PROTOTYPES',
        'TGVOIP_USE_CXX11_LIB',
        '<!@(python -c "for s in \'<(build_defines)\'.split(\',\'): print(s)")',
-@@ -93,18 +91,10 @@
+@@ -94,18 +91,10 @@
      'include_dirs': [
        '<(src_loc)',
        '<(SHARED_INTERMEDIATE_DIR)',
@@ -226,15 +227,15 @@ Last-Update: 2017-07-29
 -        '<(linux_lib_ssl)',
 -        '<(linux_lib_crypto)',
 -        '<!@(python -c "for s in \'<(linux_lib_icu)\'.split(\' \'): print(s)")',
--        'xcb',
-+        'crypto',
-         'X11',
--        'X11-xcb',
--        'dbus-1',
--        'dl',
--        'gthread-2.0',
-         'glib-2.0',
-         'pthread',
+-        '-lxcb',
++        '-lcrypto',
+         '-lX11',
+-        '-lX11-xcb',
+-        '-ldbus-1',
+-        '-ldl',
+-        '-lgthread-2.0',
+         '-lglib-2.0',
+         '-lpthread',
        ],
 @@ -238,7 +201,6 @@
          '<(qt_loc)/mkspecs/linux-g++',
@@ -302,7 +303,7 @@ Last-Update: 2017-07-29
      'cflags_cc': [
 --- a/Telegram/gyp/telegram_sources.txt
 +++ b/Telegram/gyp/telegram_sources.txt
-@@ -571,7 +571,6 @@
+@@ -586,7 +586,6 @@
  <(src_loc)/overviewwidget.h
  <(src_loc)/passcodewidget.cpp
  <(src_loc)/passcodewidget.h
@@ -310,7 +311,7 @@ Last-Update: 2017-07-29
  <(src_loc)/settings.cpp
  <(src_loc)/settings.h
  <(src_loc)/shortcuts.cpp
-@@ -583,14 +582,7 @@
+@@ -598,14 +597,7 @@
  <(emoji_suggestions_loc)/emoji_suggestions.cpp
  <(emoji_suggestions_loc)/emoji_suggestions.h
  

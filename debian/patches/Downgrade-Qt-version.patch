@@ -5,8 +5,8 @@ Last-Update: 2017-03-31
 
 --- a/Telegram/SourceFiles/main.cpp
 +++ b/Telegram/SourceFiles/main.cpp
-@@ -23,9 +23,10 @@ Copyright (c) 2014-2017 John Preston, ht
- #include "storage/localstorage.h"
+@@ -24,9 +24,10 @@ Copyright (c) 2014-2017 John Preston, ht
+ #include "core/file_utilities.h"
  
  int main(int argc, char *argv[]) {
 -#ifndef Q_OS_MAC // Retina display support is working fine, others are not.
@@ -20,7 +20,7 @@ Last-Update: 2017-03-31
  	settingsParseArgs(argc, argv);
 --- a/Telegram/SourceFiles/ui/text/text.cpp
 +++ b/Telegram/SourceFiles/ui/text/text.cpp
-@@ -1688,11 +1688,11 @@ private:
+@@ -1689,11 +1689,11 @@ private:
  		if (item == -1)
  			return;
  
