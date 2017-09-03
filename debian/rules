@@ -1,14 +1,14 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
 
-# Rules for building Debian package. Based on the follow files:
-#  * doc/building-cmake.md
+# Rules for building Debian package. Based on the following files:
+#  * docs/building-cmake.md
 #  * Telegram/gyp/refresh.sh
 #  * Telegram/Patches/gyp.diff
 # Please recheck this file if they are changed in future versions.
 
-export DEB_BUILD_MAINT_OPTIONS += hardening=+all
 include /usr/share/dpkg/default.mk
+OUT = obj-$(DEB_HOST_GNU_TYPE)
 
 ifeq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
  BUILD_MODE = Release
@@ -16,32 +16,47 @@ else
  BUILD_MODE = Debug
 endif
 
-DEFINITIONS += \
+GYPFLAGS += \
+	--format=cmake \
+	--depth=Telegram/gyp \
+	--generator-output=../.. \
+	-Duse_packed_resources \
+	-Goutput_dir=$(OUT) \
+	-Gconfig=$(BUILD_MODE)
+
+EXTRA_MACROS += \
 	DEBIAN_API_ID \
 	TDESKTOP_DISABLE_AUTOUPDATE \
 	TDESKTOP_DISABLE_CRASH_REPORTS \
 	TDESKTOP_DISABLE_REGISTER_CUSTOM_SCHEME
-export CPPFLAGS += $(DEFINITIONS:%=-D%) -Winvalid-pch
 
-# Workaround for hurd, see bugs.debian.org/799356
-ifeq ($(DEB_HOST_ARCH),hurd-i386)
- EXTRA_GYP_FLAGS += --no-parallel
+# Workarounds for non-Linux systems
+ifneq ($(DEB_HOST_ARCH_OS),linux)
+ EXTRA_MACROS += Q_OS_LINUX  # brilliant bluff :)
+ GYPFLAGS += --no-parallel  # see bugs.debian.org/799356
 endif
 
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DEB_CPPFLAGS_MAINT_APPEND = $(EXTRA_MACROS:%=-D%)
+export DEB_CXXFLAGS_MAINT_APPEND = -Werror=invalid-pch
+
+# A generated CMake config will be placed in the next "source" directory.
 %:
-	dh $@ --sourcedirectory=out/$(BUILD_MODE)
+	dh $@ --sourcedirectory=$(OUT)/$(BUILD_MODE)
 
-override_dh_auto_configure:
-	gyp --format=cmake --depth=Telegram/gyp --generator-output=../.. \
-	  -Goutput_dir=out -Gconfig=$(BUILD_MODE) Telegram/gyp/Telegram.gyp \
-	  $(EXTRA_GYP_FLAGS)
-	@# Patch CMakeLists.txt instead gyp utility. $NUM is the number of the line
-	@# before penultimate one in the generated CMakeLists.txt file. The follow
-	@# sed script inserts all lines from debian/CMakeLists.inj file.
-	NUM=$$((`wc -l < out/$(BUILD_MODE)/CMakeLists.txt` - 2)); \
-	  sed -i "$$NUM r debian/CMakeLists.inj" out/$(BUILD_MODE)/CMakeLists.txt
-	dh_auto_configure
-
+# We use a default source directory as fallback when an user tries to clear a
+# clean tree or when the clean target is called twice in a row. In this case,
+# debhelper says that the source directory doesn't exist so we omit the
+# sourcedirectory parameter.
 override_dh_auto_clean:
 	dh_auto_clean || dh_auto_clean --sourcedirectory=$(CURDIR)
-	rm -rf out
+
+# We paste the content of CMakeLists.inj into the generated CMakeLists.txt file
+# instead of patching gyp utility. $NUM is the number of the line before
+# penultimate one in CMakeLists.txt, it's the finish of the Telegram target in
+# this file. The next sed script inserts all lines from debian/CMakeLists.inj file.
+override_dh_auto_configure:
+	gyp $(GYPFLAGS) Telegram/gyp/Telegram.gyp
+	NUM=$$((`wc -l < $(OUT)/$(BUILD_MODE)/CMakeLists.txt` - 2)); \
+	sed -i "$$NUM r debian/CMakeLists.inj" $(OUT)/$(BUILD_MODE)/CMakeLists.txt
+	dh_auto_configure

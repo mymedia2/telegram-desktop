@@ -1,9 +1,19 @@
-telegram-desktop (1.1.18-1ppa1) xenial; urgency=medium
+telegram-desktop (1.1.19-2) unstable; urgency=medium
 
-  * Upload to Launchpad
-  * Bring back a patch to build against Qt 5.5
+  * Fix CVE-2016-10351 by applying Fix-Insecure-cWorkingDir-permissions.patch
+    - Set 700 permissions for the working directory on every start
+  * Apply Packed-resources.patch to reduce amount of required memory for
+    building (closes: #860510)
+  * Some refactoring the debian/rules file
 
- -- Nicholas Guriev <guriev-ns@ya.ru>  Mon, 31 Jul 2017 16:15:27 +0300
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Thu, 31 Aug 2017 23:46:47 +0300
+
+telegram-desktop (1.1.19-1) unstable; urgency=medium
+
+  * New upstream release
+  * Fix build on Debian/kFreeBSD
+
+ -- Nicholas Guriev <guriev-ns@ya.ru>  Wed, 02 Aug 2017 20:16:36 +0300
 
 telegram-desktop (1.1.18-1) unstable; urgency=medium
 

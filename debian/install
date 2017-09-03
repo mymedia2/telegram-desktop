@@ -1,7 +1,8 @@
 #!/usr/bin/dh-exec
 
-# Install binary
+# Install binary and resources
 obj-${DEB_HOST_GNU_TYPE}/Telegram => /usr/bin/telegram-desktop
+obj-${DEB_HOST_GNU_TYPE}/tresources.rcc /usr/share/TelegramDesktop
 
 # Install icons
 Telegram/Resources/art/icon16.png => /usr/share/icons/hicolor/16x16/apps/telegram.png

@@ -1,0 +1,137 @@
+From: Nicholas Guriev <guriev-ns@ya.ru>
+Date: Tue, 22 Aug 2017 16:15:36 +0300
+Subject: [PATCH] Packed resources
+Bug: https://github.com/telegramdesktop/tdesktop/pull/3817
+Last-Update: 2017-08-22
+
+---
+ Telegram/Resources/qrc/telegram.qrc          | 11 -----------
+ Telegram/SourceFiles/core/file_utilities.cpp | 17 +++++++++++++++++
+ Telegram/SourceFiles/core/file_utilities.h   |  6 ++++++
+ Telegram/SourceFiles/main.cpp                |  2 ++
+ Telegram/gyp/Telegram.gyp                    | 27 ++++++++++++++++++++++++++-
+ 5 files changed, 51 insertions(+), 12 deletions(-)
+
+--- a/Telegram/Resources/qrc/telegram.qrc
++++ b/Telegram/Resources/qrc/telegram.qrc
+@@ -10,17 +10,6 @@
+     <file alias="art/sunrise.jpg">../art/sunrise.jpg</file>
+     <file alias="night.tdesktop-theme">../night.tdesktop-theme</file>
+   </qresource>
+-  <qresource prefix="/sounds">
+-    <file alias="msg_incoming.mp3">../sounds/msg_incoming.mp3</file>
+-    <file alias="call_incoming.mp3">../sounds/call_incoming.mp3</file>
+-    <file alias="call_outgoing.mp3">../sounds/call_outgoing.mp3</file>
+-    <file alias="call_busy.mp3">../sounds/call_busy.mp3</file>
+-    <file alias="call_connect.mp3">../sounds/call_connect.mp3</file>
+-    <file alias="call_end.mp3">../sounds/call_end.mp3</file>
+-  </qresource>
+-  <qresource prefix="/qt-project.org">
+-    <file>qmime/freedesktop.org.xml</file>
+-  </qresource>
+   <qresource prefix="/langs">
+     <file alias="lang_it.strings">../langs/lang_it.strings</file>
+     <file alias="lang_es.strings">../langs/lang_es.strings</file>
+--- a/Telegram/SourceFiles/core/file_utilities.cpp
++++ b/Telegram/SourceFiles/core/file_utilities.cpp
+@@ -252,3 +252,20 @@ bool GetDefault(QStringList &files, QByt
+ 
+ } // namespace internal
+ } // namespace FileDialog
++
++void Resources::LoadAllData() {
++#ifdef TDESKTOP_USE_PACKED_RESOURCES
++	// Load resources packed into a separated file
++	QStringList paths;
++#ifdef _DEBUG
++	paths += cExeDir();
++#endif
++	paths += QStandardPaths::standardLocations(QStandardPaths::AppDataLocation);
++	for (QString directory : paths) {
++		if (QResource::registerResource(directory + qsl("/tresources.rcc"))) {
++			return;  // found
++		}
++	}
++	qFatal("Packed resources not found");
++#endif
++}
+--- a/Telegram/SourceFiles/core/file_utilities.h
++++ b/Telegram/SourceFiles/core/file_utilities.h
+@@ -76,3 +76,9 @@ bool GetDefault(QStringList &files, QByt
+ 
+ } // namespace internal
+ } // namespace FileDialog
++
++namespace Resources {
++
++void LoadAllData();
++
++} // namespace Resources
+--- a/Telegram/SourceFiles/main.cpp
++++ b/Telegram/SourceFiles/main.cpp
+@@ -21,6 +21,7 @@ Copyright (c) 2014-2017 John Preston, ht
+ #include "application.h"
+ #include "platform/platform_specific.h"
+ #include "storage/localstorage.h"
++#include "core/file_utilities.h"
+ 
+ int main(int argc, char *argv[]) {
+ #ifndef Q_OS_MAC // Retina display support is working fine, others are not.
+@@ -38,6 +39,7 @@ int main(int argc, char *argv[]) {
+ 	// both are finished in Application::closeApplication
+ 	Logs::start(); // must be started before Platform is started
+ 	Platform::start(); // must be started before QApplication is created
++	Resources::LoadAllData(); // should be called after setting an application name
+ 
+ 	// without this Telegram doesn't start on Ubuntu 17.04 due GTK errors
+ 	setenv("QT_STYLE_OVERRIDE", "qwerty", false);
+--- a/Telegram/gyp/Telegram.gyp
++++ b/Telegram/gyp/Telegram.gyp
+@@ -63,6 +63,7 @@
+       ],
+       'build_defines%': '',
+       'list_sources_command': 'python <(DEPTH)/list_sources.py --input <(DEPTH)/telegram_sources.txt --replace src_loc=<(src_loc)',
++      'use_packed_resources%': 0,
+     },
+     'includes': [
+       'common_executable.gypi',
+@@ -97,7 +98,6 @@
+       '/usr/include/opus',
+     ],
+     'sources': [
+-      '<@(qrc_files)',
+       '<@(style_files)',
+       '<!@(<(list_sources_command) <(qt_moc_list_sources_arg))',
+     ],
+@@ -105,6 +105,31 @@
+       '<!@(<(list_sources_command) <(qt_moc_list_sources_arg) --exclude_for <(build_os))',
+     ],
+     'conditions': [
++      [ 'use_packed_resources', {
++        'actions': [
++          {
++            'action_name': 'generate_resource_pack',
++            'inputs': [
++              '<(SHARED_INTERMEDIATE_DIR)/update_dependent_qrc.timestamp',
++            ],
++            'outputs': [
++              '<(PRODUCT_DIR)/tresources.rcc',
++            ],
++            'action': [
++              '<(qt_loc)/bin/rcc<(exe_ext)', '-binary',
++              '<@(qrc_files)',
++              '-o', '<@(_outputs)',
++            ],
++          },
++        ],
++        'defines': [
++          'TDESKTOP_USE_PACKED_RESOURCES',
++        ],
++      }, {
++        'sources': [
++          '<@(qrc_files)',
++        ],
++      }],
+       [ '"<(official_build_target)" != ""', {
+         'defines': [
+           'CUSTOM_API_ID',
