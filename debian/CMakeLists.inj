@@ -1,0 +1,31 @@
+# ------------- debian/CMakeLists.inj begin -------------
+# This text is putted into the end of the CMakeLists.txt file by d/rules script
+
+# Avoid rpath compiler parameter
+set_target_properties(Telegram PROPERTIES SKIP_BUILD_RPATH TRUE)
+
+# This makes up for patch of gyp utility, supporting precompiled headers. If
+# Telegram/Patches/gyp.diff file will be changed in future, please check these
+# lines.
+include(../../Telegram/gyp/helpers/PrecompiledHeader.cmake)
+add_precompiled_header(Telegram ../../Telegram/SourceFiles/stdafx.h)
+add_precompiled_header(lib_base ../../Telegram/lib_base/base/base_pch.h)
+add_precompiled_header(lib_export ../../Telegram/SourceFiles/export/export_pch.h)
+add_precompiled_header(lib_mtproto ../../Telegram/SourceFiles/mtproto/mtp_pch.h)
+add_precompiled_header(lib_spellcheck ../../Telegram/lib_spellcheck/spellcheck/spellcheck_pch.h)
+add_precompiled_header(lib_storage ../../Telegram/SourceFiles/storage/storage_pch.h)
+add_precompiled_header(lib_ui ../../Telegram/lib_ui/ui/ui_pch.h)
+
+# Telegram uses long atomic types, so on some architectures libatomic is needed.
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("
+#include <atomic>
+std::atomic_int64_t foo;
+int main() {return foo;}
+" HAVE_LONG_ATOMIC_WITHOUT_LIB)
+if (NOT HAVE_LONG_ATOMIC_WITHOUT_LIB)
+  target_link_libraries(Telegram atomic)
+endif()
+
+# vim: ft=cmake
+# -------------- debian/CMakeLists.inj end --------------

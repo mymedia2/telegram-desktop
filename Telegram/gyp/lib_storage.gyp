@@ -21,10 +21,8 @@
       'res_loc': '../Resources',
       'pch_source': '<(src_loc)/storage/storage_pch.cpp',
       'pch_header': '<(src_loc)/storage/storage_pch.h',
+      'use_common_xxhash%': 0,
     },
-    'defines': [
-      'XXH_INLINE_ALL',
-    ],
     'dependencies': [
       '<(submodules_loc)/lib_base/lib_base.gyp:lib_base',
     ],
@@ -71,6 +69,16 @@
       'sources!': [
         '<(src_loc)/storage/storage_clear_legacy_win.cpp',
         '<(src_loc)/storage/storage_file_lock_win.cpp',
+      ],
+    }], [ 'use_common_xxhash', {
+      'link_settings': {
+        'libraries': [
+          '-lxxhash',
+        ],
+      },
+    }, {
+      'defines': [
+        'XXH_INLINE_ALL',
       ],
     }]],
   }],

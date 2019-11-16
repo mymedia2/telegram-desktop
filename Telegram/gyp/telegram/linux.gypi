@@ -20,8 +20,6 @@
       ],
     },
     'libraries': [
-      '-Wl,-Bstatic',
-      '-lbreakpad_client',
       '-llzma',
       '-lopenal',
       '-lavformat',
@@ -40,6 +38,7 @@
       '-lXext',
       '-lXfixes',
       '-lXrender',
+      '-ltgvoip',
       '<(linux_lib_ssl)',
       '<(linux_lib_crypto)',
 #      '<!(pkg-config 2> /dev/null --libs <@(pkgconfig_libs))',
@@ -49,11 +48,7 @@
       '-Wno-maybe-uninitialized',
     ],
     'ldflags': [
-      '-Wl,-wrap,aligned_alloc',
-      '-Wl,-wrap,secure_getenv',
-      '-Wl,-wrap,clock_gettime',
       '-Wl,--no-as-needed,-lrt',
-      '-Wl,-Bstatic',
     ],
     'configurations': {
       'Release': {
@@ -71,15 +66,10 @@
       },
     },
     'conditions': [
-      [ '"<!(uname -p)" != "x86_64"', {
-        'ldflags': [
-          '-Wl,-wrap,__divmoddi4',
-        ],
-      }], ['not_need_gtk!="True"', {
+      ['not_need_gtk!="True"', {
         'cflags_cc': [
-          '<!(pkg-config 2> /dev/null --cflags gtk+-2.0)',
-          '<!(pkg-config 2> /dev/null --cflags glib-2.0)',
-          '<!(pkg-config 2> /dev/null --cflags dee-1.0)',
+          '<!(pkg-config --cflags gtk+-2.0)',
+          '<!(pkg-config --cflags glib-2.0)',
         ],
       }], ['<!(pkg-config ayatana-appindicator3-0.1; echo $?) == 0', {
         'cflags_cc': [ '<!(pkg-config --cflags ayatana-appindicator3-0.1)' ],

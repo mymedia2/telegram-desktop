@@ -75,10 +75,8 @@
       '<(submodules_loc)/codegen/codegen.gyp:codegen_style',
       '<(submodules_loc)/lib_base/lib_base.gyp:lib_base',
       '<(submodules_loc)/lib_ui/lib_ui.gyp:lib_ui',
-      '<(third_party_loc)/libtgvoip/libtgvoip.gyp:libtgvoip',
       '<(submodules_loc)/lib_lottie/lib_lottie.gyp:lib_lottie',
       'tests/tests.gyp:tests',
-      'utils.gyp:Updater',
       'lib_export.gyp:lib_export',
       'lib_storage.gyp:lib_storage',
       'lib_ffmpeg.gyp:lib_ffmpeg',
@@ -105,6 +103,7 @@
       '<(minizip_loc)',
       '<(sp_media_key_tap_loc)',
       '<(emoji_suggestions_loc)',
+      '/usr/include/libtgvoip',
     ],
     'sources': [
       '<@(qrc_files)',
