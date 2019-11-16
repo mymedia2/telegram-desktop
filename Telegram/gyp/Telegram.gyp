@@ -50,6 +50,7 @@
         'ko',
         'pt-BR',
       ],
+      'use_packed_resources%': 0,
       'list_sources_command': 'python <(submodules_loc)/lib_base/gyp/list_sources.py --input <(DEPTH)/telegram/sources.txt --replace src_loc=<(src_loc)',
       'pch_source': '<(src_loc)/stdafx.cpp',
       'pch_header': '<(src_loc)/stdafx.h',
@@ -106,7 +107,6 @@
       '/usr/include/libtgvoip',
     ],
     'sources': [
-      '<@(qrc_files)',
       '<@(style_files)',
       '<(res_loc)/langs/cloud_lang.strings',
       '<(res_loc)/export_html/css/style.css',
@@ -134,6 +134,30 @@
       ],
       'dependencies': [
         'utils.gyp:Packer',
+      ],
+    }], [ 'use_packed_resources', {
+      'actions': [
+        {
+          'action_name': 'generate_resource_pack',
+          'inputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/update_dependent_qrc.timestamp',
+          ],
+          'outputs': [
+            '<(PRODUCT_DIR)/tresources.rcc',
+          ],
+          'action': [
+            '<(qt_bindir)/rcc<(exe_ext)', '-binary',
+            '<@(qrc_files)',
+            '-o', '<@(_outputs)',
+          ],
+        },
+      ],
+      'defines': [
+        'DESKTOP_APP_USE_PACKED_RESOURCES',
+      ],
+    }, {
+      'sources': [
+        '<@(qrc_files)',
       ],
     }]],
   }],

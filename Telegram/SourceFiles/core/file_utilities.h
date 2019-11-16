@@ -105,3 +105,9 @@ bool GetDefault(
 
 } // namespace internal
 } // namespace FileDialog
+
+namespace Resources {
+
+void LoadAllData();
+
+} // namespace Resources
