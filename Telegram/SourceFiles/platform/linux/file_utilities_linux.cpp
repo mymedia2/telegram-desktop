@@ -508,7 +508,7 @@ void GtkFileDialog::onSelectionChanged(GtkDialog *gtkDialog, GtkFileDialog *help
 //	gchar *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(gtkDialog));
 //	if (filename) {
 //		selection = QString::fromUtf8(filename);
-//		g_free(filename);
+//		Libs::g_free(filename);
 //	}
 //	emit helper->currentChanged(QUrl::fromLocalFile(selection));
 }
