@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/gui">
+    <file alias="art/logo_256.png">@CMAKE_CURRENT_BINARY_DIR@/art/logo_256.png</file>
+    <file alias="art/logo_256_no_margin.png">@CMAKE_CURRENT_BINARY_DIR@/art/logo_256_no_margin.png</file>
+  </qresource>
+</RCC>
+<!-- vi:se ft=xml: -->

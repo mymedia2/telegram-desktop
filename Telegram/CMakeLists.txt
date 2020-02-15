@@ -21,9 +21,11 @@ add_subdirectory(lib_qr)
 add_subdirectory(codegen)
 
 include(CheckCXXSourceCompiles)
+include(GNUInstallDirs)
 include(lib_ui/cmake/generate_styles.cmake)
 include(cmake/generate_lang.cmake)
 include(cmake/generate_numbers.cmake)
+include(cmake/raster_icon.cmake)
 
 get_filename_component(src_loc SourceFiles REALPATH)
 get_filename_component(res_loc Resources REALPATH)
@@ -63,6 +65,26 @@ set(dependent_style_files
 generate_styles(Telegram ${src_loc} "${style_files}" "${dependent_style_files}")
 generate_lang(Telegram ${res_loc}/langs/lang.strings)
 generate_numbers(Telegram ${res_loc}/numbers.txt)
+
+foreach (size 16 32 48 64 128 256 512)
+    raster_icon(${res_loc}/art/logo_256.svg art/logo_${size}.png ${size}x${size})
+endforeach()
+raster_icon(${res_loc}/art/logo_256_no_margin.svg art/logo_256_no_margin.png)
+configure_file(${res_loc}/qrc/telegram/logo.qrc.in art/logo.qrc @ONLY)
+target_sources(Telegram PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/art/logo.qrc)
+add_custom_target(Telegram_icons
+DEPENDS
+    art/logo_16.png
+    art/logo_32.png
+    art/logo_48.png
+    art/logo_64.png
+    art/logo_128.png
+    art/logo_256.png
+    art/logo_512.png
+)
+if (DESKTOP_APP_USE_PACKAGED)
+    add_dependencies(Telegram Telegram_icons)
+endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON AUTORCC ON)
 
@@ -995,6 +1017,7 @@ PRIVATE
     qrc/emoji_5.qrc
     qrc/emoji_preview.qrc
     qrc/telegram/telegram.qrc
+    qrc/telegram/logo.qrc.in
     qrc/telegram/sounds.qrc
     winrc/Telegram.rc
     winrc/Telegram.manifest
@@ -1197,16 +1220,21 @@ if ((NOT disable_autoupdate OR NOT LINUX) AND NOT build_macstore AND NOT build_w
     endif()
 endif()
 
-if (LINUX AND DESKTOP_APP_USE_PACKAGED)
-    include(GNUInstallDirs)
-    install(TARGETS Telegram RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    install(FILES "Resources/art/icon16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "telegram.png")
-    install(FILES "Resources/art/icon512.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/512x512/apps" RENAME "telegram.png")
-    install(FILES "../lib/xdg/telegramdesktop.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications" RENAME "${TDESKTOP_LAUNCHER_BASENAME}.desktop")
-    install(FILES "../lib/xdg/telegramdesktop.appdata.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo" RENAME "${TDESKTOP_LAUNCHER_BASENAME}.appdata.xml")
+if (NOT APPLE)
+    install(TARGETS Telegram RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+foreach (size 16 32 48 64 128 256 512)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/art/logo_${size}.png
+            DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/${size}x${size}/apps
+            RENAME telegram.png
+            OPTIONAL)
+endforeach()
+install(FILES ${res_loc}/art/logo_256.svg
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+        RENAME telegram.svg)
+install(FILES ${CMAKE_SOURCE_DIR}/lib/xdg/telegramdesktop.desktop
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+        RENAME "${TDESKTOP_LAUNCHER_BASENAME}.desktop")
+install(FILES ${CMAKE_SOURCE_DIR}/lib/xdg/telegramdesktop.appdata.xml
+        DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo
+        RENAME "${TDESKTOP_LAUNCHER_BASENAME}.appdata.xml")
