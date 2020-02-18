@@ -1,6 +1,6 @@
 name: telegram-desktop
 adopt-info: telegram
-icon: Telegram/Resources/art/icon512@2x.png
+icon: Telegram/Resources/art/logo_256.svg
 
 base: core18
 grade: stable
