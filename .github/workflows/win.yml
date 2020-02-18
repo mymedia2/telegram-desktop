@@ -104,6 +104,9 @@ jobs:
           cd C\Util\LzmaLib
           msbuild -m LzmaLib.sln /property:Configuration=Debug
 
+      - name: Retrieve CairoSVG.
+        run: pip3 install cairosvg==2.4.2
+
       - name: OpenSSL cache.
         id: cache-openssl
         uses: actions/cache@v1

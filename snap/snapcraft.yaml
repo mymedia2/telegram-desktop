@@ -69,6 +69,8 @@ parts:
       - libopus-dev
       - libpulse-dev
       - libssl-dev
+      - python3-minimal
+      - python3-pip
       - zlib1g-dev
     stage-packages:
       - qt5-image-formats-plugins
@@ -108,12 +110,11 @@ parts:
       if [ "$beta" != "0" ]; then
         version="$version-beta"
       fi
-
       version="${version}$(git describe --tags | sed 's,^v[^-]\+,,')"
-
       snapcraftctl set-version "$version"
 
       sed -i 's|^Icon=.*|Icon=/share/icons/hicolor/512x512/apps/telegram.png|g' lib/xdg/telegramdesktop.desktop
+      pip3 install cairosvg==2.4.2
     after:
       - cmake
       - desktop-qt5

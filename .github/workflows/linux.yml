@@ -71,6 +71,12 @@ jobs:
           sudo update-alternatives --config gcc && \
           sudo add-apt-repository --remove ppa:ubuntu-toolchain-r/test -y
 
+          apt-get install -y --no-install-recommends \
+            python3.5 libpython3.5-dev libpng-dev libjpeg-dev libcairo2
+          wget https://bootstrap.pypa.io/get-pip.py -P /tmp
+          python3.5 /tmp/get-pip.py
+          python3.5 -m pip install cairosvg==2.4.2
+
           gcc --version
 
           gcc --version > CACHE_KEY.txt
