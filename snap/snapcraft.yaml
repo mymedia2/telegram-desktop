@@ -69,8 +69,11 @@ parts:
       - libopus-dev
       - libpulse-dev
       - libssl-dev
+      - libcairo2
       - python3-minimal
       - python3-pip
+      - python3-setuptools
+      - python3-wheel
       - zlib1g-dev
     stage-packages:
       - qt5-image-formats-plugins
