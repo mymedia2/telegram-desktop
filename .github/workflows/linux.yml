@@ -147,9 +147,8 @@ jobs:
         run: |
           cd $LibrariesPath
 
-          git clone git://anongit.freedesktop.org/vdpau/libvdpau
+          git clone -b libvdpau-1.2 --depth=1 https://gitlab.freedesktop.org/vdpau/libvdpau.git
           cd libvdpau
-          git checkout libvdpau-1.2
           ./autogen.sh --enable-static
           make -j$(nproc)
           sudo make install
