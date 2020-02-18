@@ -53,7 +53,8 @@ jobs:
           cd $REPO_NAME
 
           brew install automake fdk-aac lame libass libtool libvorbis libvpx \
-          ninja opus sdl shtool texi2html theora x264 xvid yasm pkg-config
+            ninja opus sdl shtool texi2html theora x264 xvid yasm pkg-config
+          pip3 install cairosvg==2.4.2
 
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
