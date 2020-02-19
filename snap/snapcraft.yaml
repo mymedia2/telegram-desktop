@@ -69,6 +69,7 @@ parts:
       - libopus-dev
       - libpulse-dev
       - libssl-dev
+      - libffi-dev
       - libcairo2
       - python3-minimal
       - python3-pip
