@@ -104,9 +104,6 @@ jobs:
           cd C\Util\LzmaLib
           msbuild -m LzmaLib.sln /property:Configuration=Debug
 
-      - name: Retrieve CairoSVG.
-        run: pip3 install cairosvg==2.4.2
-
       - name: OpenSSL cache.
         id: cache-openssl
         uses: actions/cache@v1
@@ -150,6 +147,32 @@ jobs:
           git checkout tdesktop
           cd contrib\vstudio\vc14
           msbuild -m zlibstat.vcxproj /property:Configuration=Debug
+
+      - name: Retrieve CairoSVG.
+        shell: bash
+        run: |
+          set -x
+          cd $LibrariesPath
+
+          git clone -b pixman-0.38.4 --depth=1 https://gitlab.freedesktop.org/pixman/pixman.git
+          pushd pixman
+          ./configure --prefix=/opt/pixman-0.38.4 \
+            --disable-shared --enable-static --with-pic \
+            --disable-gtk --disable-mmx --disable-sse2 --disable-ssse3
+          make -C pixman -j$(nproc)
+          make -C pixman install
+          make install-am
+          export PKG_CONFIG_PATH=/opt/pixman-0.38.4/lib/pkgconfig
+          popd
+
+          git clone -b 1.17.2 --depth=1 https://gitlab.freedesktop.org/cairo/cairo.git
+          pushd cairo
+          ./configure --enable-shared --disable-static --with-pic
+          make -C src -j4
+          make -C src install #DESTDIR=/tmp/cairo-1.16.0
+          popd
+
+          pip3 install cairosvg==2.4.2
 
       - name: OpenAL Soft cache.
         id: cache-openal
