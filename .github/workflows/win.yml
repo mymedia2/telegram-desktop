@@ -156,6 +156,7 @@ jobs:
 
           git clone -b pixman-0.38.4 --depth=1 https://gitlab.freedesktop.org/pixman/pixman.git
           pushd pixman
+          ./autogen.sh
           ./configure --prefix=/opt/pixman-0.38.4 \
             --disable-shared --enable-static --with-pic \
             --disable-gtk --disable-mmx --disable-sse2 --disable-ssse3
@@ -167,9 +168,10 @@ jobs:
 
           git clone -b 1.17.2 --depth=1 https://gitlab.freedesktop.org/cairo/cairo.git
           pushd cairo
+          ./autogen.sh
           ./configure --enable-shared --disable-static --with-pic
-          make -C src -j4
-          make -C src install #DESTDIR=/tmp/cairo-1.16.0
+          make -C src -j$(nproc)
+          make -C src install #DESTDIR=/tmp/cairo-1.17.2
           popd
 
           pip3 install cairosvg==2.4.2
