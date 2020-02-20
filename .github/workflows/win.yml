@@ -73,7 +73,7 @@ jobs:
 
       - name: Choco installs.
         run: |
-          choco install --no-progress -y nasm yasm jom ninja
+          choco install --no-progress -y nasm yasm jom ninja msys2 wget
 
       - name: Range-v3.
         shell: bash
@@ -154,9 +154,9 @@ jobs:
           set -x
           cd $LibrariesPath
 
-          git clone -b pixman-0.38.4 --depth=1 https://gitlab.freedesktop.org/pixman/pixman.git
-          pushd pixman
-          ./autogen.sh
+          wget https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
+          tar -xf pixman-0.38.4.tar.gz
+          pushd pixman-0.38.4
           ./configure --prefix=/opt/pixman-0.38.4 \
             --disable-shared --enable-static --with-pic \
             --disable-gtk --disable-mmx --disable-sse2 --disable-ssse3
@@ -166,9 +166,9 @@ jobs:
           export PKG_CONFIG_PATH=/opt/pixman-0.38.4/lib/pkgconfig
           popd
 
-          git clone -b 1.17.2 --depth=1 https://gitlab.freedesktop.org/cairo/cairo.git
-          pushd cairo
-          ./autogen.sh
+          wget https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
+          tar -xf cairo-1.16.0.tar.xz
+          pushd cairo-1.16.0
           ./configure --enable-shared --disable-static --with-pic
           make -C src -j$(nproc)
           make -C src install #DESTDIR=/tmp/cairo-1.17.2
@@ -279,7 +279,6 @@ jobs:
         shell: cmd
         run: |
           %VC%
-          choco install --no-progress -y msys2
 
           git clone %GIT%/FFmpeg/FFmpeg.git ffmpeg
           cd ffmpeg
