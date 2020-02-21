@@ -153,13 +153,14 @@ jobs:
         run: |
           set -x
           cd $LibrariesPath
+          echo PATH=$PATH CC=$CC CXX=$CXX
 
           wget -nv https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
           tar -xf pixman-0.38.4.tar.gz
           pushd pixman-0.38.4
           ./configure --prefix=/opt/pixman-0.38.4 \
-            --disable-shared --enable-static --with-pic \
-            --disable-gtk --disable-mmx --disable-sse2 --disable-ssse3
+            --disable-shared --enable-static --with-pic --disable-gtk \
+            --disable-mmx --disable-sse2 --disable-ssse3 CC=cl.exe
           make -C pixman -j$(nproc)
           make -C pixman install
           make install-am
@@ -169,7 +170,7 @@ jobs:
           wget -nv https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
           tar -xf cairo-1.16.0.tar.xz
           pushd cairo-1.16.0
-          ./configure --enable-shared --disable-static --with-pic
+          ./configure --enable-shared --disable-static --with-pic CC=cl.exe
           make -C src -j$(nproc)
           make -C src install #DESTDIR=/tmp/cairo-1.17.2
           popd
