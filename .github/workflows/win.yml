@@ -73,7 +73,7 @@ jobs:
 
       - name: Choco installs.
         run: |
-          choco install --no-progress -y nasm yasm jom ninja msys2 wget
+          choco install --no-progress -y nasm yasm jom ninja wget
 
       - name: Range-v3.
         shell: bash
@@ -154,7 +154,7 @@ jobs:
           set -x
           cd $LibrariesPath
 
-          wget https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
+          wget -nv https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
           tar -xf pixman-0.38.4.tar.gz
           pushd pixman-0.38.4
           ./configure --prefix=/opt/pixman-0.38.4 \
@@ -166,7 +166,7 @@ jobs:
           export PKG_CONFIG_PATH=/opt/pixman-0.38.4/lib/pkgconfig
           popd
 
-          wget https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
+          wget -nv https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
           tar -xf cairo-1.16.0.tar.xz
           pushd cairo-1.16.0
           ./configure --enable-shared --disable-static --with-pic
@@ -279,6 +279,7 @@ jobs:
         shell: cmd
         run: |
           %VC%
+          choco install --no-progress -y msys2
 
           git clone %GIT%/FFmpeg/FFmpeg.git ffmpeg
           cd ffmpeg

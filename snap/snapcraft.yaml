@@ -119,6 +119,9 @@ parts:
 
       sed -i 's|^Icon=.*|Icon=/share/icons/hicolor/512x512/apps/telegram.png|g' lib/xdg/telegramdesktop.desktop
       pip3 install cairosvg==2.4.2
+
+      echo PATH=$PATH
+      python3 -c 'print(__import__("cairosvg").__file__)'
     after:
       - cmake
       - desktop-qt5
