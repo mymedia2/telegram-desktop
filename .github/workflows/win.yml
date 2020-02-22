@@ -152,30 +152,24 @@ jobs:
         shell: bash
         run: |
           set -x
-          cd $LibrariesPath
-          echo PATH=$PATH CC=$CC CXX=$CXX
+          mkdir -p "${LibrariesPath}/cairosvg_dep" && cd "$_"
+          GetUnpack() {
+            local url="$1"
+            local file=`mktemp XXXXXXXXXX.zip`
+            curl -o "$file" "$url"
+            unzip "$file"
+            rm "$file"
+          }
 
-          wget -nv https://www.cairographics.org/releases/pixman-0.38.4.tar.gz
-          tar -xf pixman-0.38.4.tar.gz
-          pushd pixman-0.38.4
-          ./configure --prefix=/opt/pixman-0.38.4 \
-            --disable-shared --enable-static --with-pic --disable-gtk \
-            --disable-mmx --disable-sse2 --disable-ssse3 CC=cl.exe
-          make -C pixman -j$(nproc)
-          make -C pixman install
-          make install-am
-          export PKG_CONFIG_PATH=/opt/pixman-0.38.4/lib/pkgconfig
-          popd
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/cairo_1.10.2-1_win64.zip
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/fontconfig_2.8.0-2_win64.zip
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/freetype_2.4.4-1_win64.zip
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/libpng_1.4.3-1_win64.zip
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/zlib_1.2.5-1_win64.zip
+          GetUnpack https://ftp.gnome.org/pub/gnome/binaries/win64/dependencies/expat_2.0.1-3_win64.zip
+          pip install cairosvg==2.4.2
 
-          wget -nv https://www.cairographics.org/releases/cairo-1.16.0.tar.xz
-          tar -xf cairo-1.16.0.tar.xz
-          pushd cairo-1.16.0
-          ./configure --enable-shared --disable-static --with-pic CC=cl.exe
-          make -C src -j$(nproc)
-          make -C src install #DESTDIR=/tmp/cairo-1.17.2
-          popd
-
-          pip3 install cairosvg==2.4.2
+          cp bin/*.dll $WINDIR/System32
 
       - name: OpenAL Soft cache.
         id: cache-openal
